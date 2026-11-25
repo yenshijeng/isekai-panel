@@ -3,7 +3,7 @@
 (function(){
 'use strict';
 var D={};
-D.VER='0.1.0';
+D.VER='0.1.2';
 
 // ===== 地點 =====
 // 鍵名以 p 開頭的是珀蘭城，其餘是灰榆鎮。
@@ -123,20 +123,25 @@ D.FL=[null,
 // 一次遭遇的魔物數量上限（依層數）
 D.encounterCap=function(lv){return lv>=8?4:lv>=4?3:lv>=2?2:1};
 
+// ===== 光線 =====
+// 迷宮的牆自己會發光，所以不需要燈。畫面不閃爍。
+// 亮度 = near /（1 + k1×距離 + k2×距離²），上限 max；vignette 是畫面四角變暗的程度（0＝不變暗）。
+D.LIGHT={near:1.25,max:1.12,k1:0.07,k2:0.012,vignette:0.18};
+
 // ===== 牆面配色 =====
-// 灰榆：樹根與泥土，越深越暗。珀蘭：石造水道，越深越藍。
+// 灰榆：樹根與泥土，越深越偏褐。珀蘭：石造水道，越深越藍。
 function mix(a,b,t){return[Math.round(a[0]+(b[0]-a[0])*t),Math.round(a[1]+(b[1]-a[1])*t),Math.round(a[2]+(b[2]-a[2])*t)]}
 function hex(c){return'#'+c.map(function(v){return('0'+Math.max(0,Math.min(255,v)).toString(16)).slice(-2)}).join('')}
 function pal(w,door){
  return{w:w,door:door,
-  ce:[hex(mix([0,0,0],w,.03)),hex(mix([0,0,0],w,.13))],
-  fl:[hex(mix([0,0,0],w,.06)),hex(mix([0,0,0],w,.2))]};
+  ce:[hex(mix([0,0,0],w,.5)),hex(mix([0,0,0],w,.3))],   // 天花板：頭頂亮、遠處暗
+  fl:[hex(mix([0,0,0],w,.32)),hex(mix([0,0,0],w,.62))]}; // 地板：遠處暗、腳邊亮
 }
 D.PAL=[null];
 D.FL.forEach(function(f){
  if(!f)return;
- if(f.dg==='hui'){var t=(f.lv-1)/6;D.PAL.push(pal(mix([104,112,66],[92,70,52],t),[112,72,34]))}
- else{var u=(f.lv-1)/11;D.PAL.push(pal(mix([138,136,128],[70,92,132],u),[100,86,70]))}
+ if(f.dg==='hui'){var t=(f.lv-1)/6;D.PAL.push(pal(mix([198,204,154],[214,188,152],t),[150,108,62]))}
+ else{var u=(f.lv-1)/11;D.PAL.push(pal(mix([216,214,206],[164,188,224],u),[146,124,100]))}
 });
 
 window.ISK_DATA=D;
