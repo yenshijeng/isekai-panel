@@ -101,6 +101,48 @@ ok(!/undefined|NaN|手繩|銀幣|燈油/.test(c + tail), '給 AI 的資料有殘
 ok(!/米諾斯|手繩|銀幣|燈油|線之|阿里阿德涅/.test(html), '頁面有米諾斯殘留字樣');
 console.log(c);
 
+// 4b. 六人隊伍、站位、魔物房、首領房等候室、全隊倒下
+console.log('== 隊伍與戰鬥 ==');
+T.act2('allJoin');
+ok(G.roster.length === 8 && G.party.length === 5, '全部加入後應有 8 位同伴、5 位出戰，實際 ' + G.roster.length + '/' + G.party.length);
+const rows = T.members().map(u => u.row || 'f');
+ok(rows.filter(r => r === 'f').length <= 3 && rows.filter(r => r === 'b').length <= 3, '前後衛人數超過 3');
+ok(T.setRow(G.roster.find(r => r.name === '伊瑟琳'), 'f') !== '' || T.members().filter(u => (u.row) === 'f').length <= 3, '前衛已滿時不應再塞人');
+Object.keys(D.COMP).forEach(n => { const p = G.roster.find(r => r.name === n), st = T.st(p);
+  ok(st.hp > 0 && st.mp >= 0 && !isNaN(st.def), n + ' 的能力值有誤');
+  D.COMP[n].ai.forEach(k => ok(D.SKILL[k], n + ' 的技能 ' + k + ' 沒有定義')); });
+for (let f = 1; f < D.FL.length; f++) { const d = T.fd(f), nest = d.feats.filter(x => x.type === 'nest');
+  ok(nest.length === 1, D.FL[f].n + ' 沒有魔物房');
+  ok(d.grid.some(r => r.indexOf('H') >= 0), D.FL[f].n + ' 沒有隱藏牆');
+  if (nest[0]) ok(nest[0].foes.length <= D.NEST.max && nest[0].foes.length >= 4, D.FL[f].n + ' 魔物房數量不對');
+  d.feats.filter(x => x.type === 'mon' && D.EN[x.foes[0]].pack && x.foes.every(k => k === x.foes[0])).forEach(x => ok(x.foes.length === D.encounterCap(D.FL[f].lv), D.FL[f].n + ' 成群魔物沒有滿編')); }
+G.loc = 'hgate'; G.pts = 1000; T.enter(1); flush();
+// 走進隱藏牆：牆會打開，不會直接開戰
+const dd = T.fd(1); let hx = -1, hy = -1; dd.grid.forEach((r, y) => r.forEach((c, x) => { if (c === 'H') { hx = x; hy = y; } }));
+const nb = [[0, -1, 0], [1, 0, 1], [0, 1, 2], [-1, 0, 3]].map(o => ({ x: hx - o[0], y: hy - o[1], d: o[2] })).find(o => T.CUR()[o.y] && T.CUR()[o.y][o.x] === '.' && !dd.feats.some(ft => ft.x === o.x && ft.y === o.y));
+T.put(nb.x, nb.y); T.face(nb.d); T.act('fwd'); flush();
+ok(T.CUR()[hy][hx] === '.' && !T.BT(), '隱藏牆沒有打開');
+// 首領房等候室：走向首領先跳確認
+const bs = dd.feats.find(x => x.type === 'boss');
+const bn = [[0, -1, 0], [1, 0, 1], [0, 1, 2], [-1, 0, 3]].map(o => ({ x: bs.x - o[0], y: bs.y - o[1], d: o[2] })).find(o => T.CUR()[o.y] && T.CUR()[o.y][o.x] === '.');
+delete G.guard[1]; T.put(bn.x, bn.y); T.face(bn.d); T.act('fwd'); flush();
+ok(!T.BT() && /等候室/.test(T.modalHtml()), '走向首領時沒有出現等候室');
+// 六人戰鬥跑得完，且結束後沒有人停在 0 HP
+const r6 = fight(dd.feats.find(x => x.type === 'nest'));
+ok(r6 === 'win', '六人打魔物房沒有獲勝：' + r6);
+ok(T.members().every(u => u.hp > 0), '戰後有人停在 0 HP');
+ok(!/undefined|NaN/.test(T.ui('dg') + T.ui('stat')), '隊伍畫面出現 undefined 或 NaN');
+// 全隊倒下：不會結束遊戲，回到入口，扣三成納爾
+T.exit(); flush(); G.loc = 'pgate'; G.bound = []; for (let i = 1; i < 19; i++) G.bound.push(i);
+G.party = []; G.lv = 1; G.hp = 10; G.pts = 1000; T.enter(19); flush();
+const p0 = G.pts; T.startBattle({ type: 'mon', id: 'x', foes: ['獨眼岩偶', '鐵角牛', '毒棘蠍'], ctx: 'dg' });
+let nn = 0; while (T.BT() && !T.BT().over && nn++ < 300) T.cmd('def');
+ok(T.BT() && T.BT().over === 'lose', '應該全隊倒下');
+flush(); ok(/全隊倒下/.test(T.modalHtml()), '沒有出現全隊倒下的說明');
+T.act2('doWipe'); flush();
+ok(!G.in && !G.dead && G.loc === 'pgate' && G.pts === p0 - Math.floor(p0 * .3) && G.hp > 0, '全隊倒下後的狀態不對');
+G.lv = 6; G.hp = T.st(G).hp; T.act2('allJoin');
+
 // 5. 每個分頁、每個地點都畫得出來
 console.log('== 畫面 ==');
 Object.keys(D.LOC).forEach(loc => {
@@ -115,7 +157,7 @@ G.loc = 'hguild'; ok(/回復藥/.test(T.ui('shop')) && /歸途石/.test(T.ui('sh
 G.loc = 'smith'; ok(/強化攻擊/.test(T.ui('shop')), '工坊沒有強化選項');
 G.loc = 'pgate'; ok(/進入珀蘭大迷宮/.test(T.ui('story')) && /回灰榆鎮/.test(T.ui('story')), '珀蘭入口的按鈕不對');
 G.loc = 'inn'; ok(/前往珀蘭城/.test(T.ui('story')) && !/進入灰榆迷宮/.test(T.ui('story')), '旅館的按鈕不對');
-G.loc = 'hgate'; const ask = T.ask();
+G.loc = 'hgate'; G.bound = [1]; const ask = T.ask();
 ok(/第1層/.test(ask) && /第2層/.test(ask) && !/第3層/.test(ask) && !/undefined/.test(ask), '入口選層視窗不對');
 T.enter(2); flush(); ok(/入口小房間/.test(T.spring()) && /回地面/.test(T.spring()), '入口小房間選單不對');
 ok(!/undefined|NaN/.test(T.ui('dg')), '迷宮畫面出現 undefined');

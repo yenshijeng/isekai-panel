@@ -72,6 +72,11 @@ textarea{min-height:70px;resize:vertical}label{display:block;font-size:13px;colo
 #mbox{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:14px;max-width:480px;width:100%;max-height:88vh;overflow:auto}
 #mbox h3,#mbox h4{margin:0 0 8px;color:var(--amb)}#mbox .btn{display:block;width:100%;margin-top:6px;text-align:left;padding:10px 12px}#mbox .mut{margin:4px 0}
 .dead{color:var(--red);font-weight:700}
+.rw{display:inline-block;font-size:10px;line-height:15px;width:15px;text-align:center;border-radius:3px;margin-right:4px;color:#111;font-weight:700}.rw.f{background:#e0b95a}.rw.b{background:#7fb0d8}
+.hb.mb{margin-top:2px;background:#16223a}.pc .hb.mb i,.hb.mb i{background:#4a8ad8}
+.ec .st{font-size:11px;color:var(--amb);min-height:14px}.ec.sm{font-size:11px;padding:3px}
+.btn.sm{padding:4px 9px;font-size:12px;min-height:0;width:auto;display:inline-block;margin:2px 4px 0 0}
+#party{grid-template-columns:1fr 1fr}
 </style>
 </head>
 <body>
@@ -96,22 +101,18 @@ function djb(s){var h=5381;for(var i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i
 var LOC=D.LOC,DG=D.DUNGEON,SHOPS=D.SHOPS;
 var UPMAX=6;function upCost(k,n){return k==='a'?60*(n+1):50*(n+1)}
 var ITEM=D.ITEM;
-var ALLY={'盾手':{hp:90,dmg:10},'弓手':{hp:60,dmg:14},'祭司':{hp:60,dmg:6},'工匠':{hp:70,dmg:9}};
-var CORE={};
-var SK={str:{n:'強擊',lv:1,sp:2,t:'foe',d:'單體 1.8 倍傷害'},combo:{n:'連擊',lv:3,sp:2,t:'foe',d:'打兩次，各 0.9 倍傷害'},pierce:{n:'破甲',lv:5,sp:2,t:'foe',d:'單體 1.2 倍傷害，無視防禦'},cheer:{n:'鼓舞',lv:7,sp:3,t:'self',d:'全隊傷害 +25%，持續 3 回合'},heal:{n:'治療',lv:9,sp:3,t:'ally',d:'回復一名隊友 35% 生命'}};
-var SKO=['str','combo','pierce','cheer','heal'];
-var ASK={'盾手':['pierce','str','cheer'],'弓手':['combo','str','pierce'],'祭司':['heal','cheer','str'],'工匠':['pierce','combo','cheer']};
-function learned(){return SKO.filter(function(k){return G.lv>=SK[k].lv}).map(function(k){return SK[k].n})}
-var BOND=['陌生','普通','信任','親密'];
+var SK=D.SKILL,SKO=D.HERO_SKILLS.map(function(x){return x[0]}),SKLV={};D.HERO_SKILLS.forEach(function(x){SKLV[x[0]]=x[1]});
+function learned(){return SKO.filter(function(k){return G.lv>=SKLV[k]}).map(function(k){return SK[k].n})}
+var BOND=['試用契約','正式契約','無期契約'];
 var EN=D.EN,BOSS=D.BOSS;
 function lvOf(f){return(f&&FL[f])?FL[f].lv:1}
 function enemyStat(k,f){var s=1+D.SCALE*(lvOf(f)-1),b=BOSS[k],t,e;
  if(b){e=EN[b.base];var m=D.BOSS_MULT[b.uniq?'uniq':'normal'];t=Object.assign({},e);
-  t.hp=Math.round(e.hp*s*m.hp);t.d=Math.round(e.d*s*m.d);t.xp=Math.round(e.xp*s*m.xp);t.pts=Math.round(e.pts*s*m.pts);t.arm=Math.round((e.arm||0)*s);
+  t.hp=Math.round(e.hp*s*m.hp*D.EN_HP);t.d=Math.round(e.d*s*m.d*D.EN_DMG);t.xp=Math.round(e.xp*s*m.xp);t.pts=Math.round(e.pts*s*m.pts);t.arm=Math.round((e.arm||0)*s);
   t.boss=1;t.uniq=b.uniq?1:0;if(b.img)t.img=b.img;if(b.shape)t.shape=b.shape;if(b.col)t.col=b.col;return t}
  e=EN[k];var elite=false;
  if(!e){var nm=Object.keys(EN).sort(function(a,b){return b.length-a.length}).filter(function(x){return k.indexOf(x)>=0})[0];e=EN[nm||'地痞'];elite=/變異|巨大|首領|精英/.test(k)}
- t=Object.assign({},e);t.hp=Math.round(e.hp*s*(elite?2:1));t.d=Math.round(e.d*s*(elite?1.4:1));t.xp=Math.round(e.xp*s*(elite?2:1));t.pts=Math.round(e.pts*s*(elite?2:1));t.arm=Math.round((e.arm||0)*s);return t}
+ t=Object.assign({},e);t.hp=Math.round(e.hp*s*(elite?2:1)*D.EN_HP);t.d=Math.round(e.d*s*(elite?1.4:1)*D.EN_DMG);t.xp=Math.round(e.xp*s*(elite?2:1));t.pts=Math.round(e.pts*s*(elite?2:1));t.arm=Math.round((e.arm||0)*s);return t}
 var FL=D.FL;
 //#FL-END
 var PAL=D.PAL;
@@ -144,31 +145,46 @@ function genFloor(f){
  for(i=0;i<ends.length&&!doorEnd;i++){var e=ends[i],nb=null;D4.forEach(function(d){if(g[e.y+d[1]][e.x+d[0]]==='.')nb={x:e.x+d[0],y:e.y+d[1]}});
   if(nb&&deg(nb.x,nb.y)===2){doorEnd=e;ends.splice(i,1);g[nb.y][nb.x]='D';mark(e);used[nb.x+','+nb.y]=1}}
  if(doorEnd){var ka=spot();feats.push({id:'key',type:'key',x:ka.x,y:ka.y});feats.push({id:'cd',type:'chest',x:doorEnd.x,y:doorEnd.y,good:1})}
+ var cap=D.encounterCap(cfg.lv),nest=null;
+ for(i=0;i<ends.length&&!nest;i++){var e2=ends[i],nb2=null;D4.forEach(function(d){if(g[e2.y+d[1]][e2.x+d[0]]==='.')nb2={x:e2.x+d[0],y:e2.y+d[1]}});
+  if(nb2&&deg(nb2.x,nb2.y)===2&&!used[nb2.x+','+nb2.y]){nest=e2;ends.splice(i,1);g[nb2.y][nb2.x]='H';mark(e2);used[nb2.x+','+nb2.y]=1}}
+ if(nest){var nf=[],nn=Math.min(D.NEST.max,cap+D.NEST.extra);for(j=0;j<nn;j++)nf.push(cfg.mons[0]);feats.push({id:'nest',type:'nest',x:nest.x,y:nest.y,foes:nf})}
  var c1=spot();feats.push({id:'c1',type:'chest',x:c1.x,y:c1.y});
  var cand=cells.filter(function(c){return c.d>=4&&!used[c.x+','+c.y]});
  for(i=cand.length-1;i>0;i--){j=Math.floor(r()*(i+1));t=cand[i];cand[i]=cand[j];cand[j]=t}
  var nm=Math.min(cfg.nM,cand.length);
- for(i=0;i<nm;i++){var cnt=Math.min(D.encounterCap(cfg.lv),1+(r()<0.5?1:0)+(r()<0.25?1:0)+(r()<0.12?1:0)),fo=[],kind=r()<0.6?cfg.mons[0]:cfg.mons[Math.floor(r()*cfg.mons.length)];
-  for(j=0;j<cnt;j++)fo.push(r()<0.7?kind:cfg.mons[Math.floor(r()*cfg.mons.length)]);
+ for(i=0;i<nm;i++){var cnt=Math.min(cap,1+(r()<0.5?1:0)+(r()<0.25?1:0)+(r()<0.12?1:0)),fo=[],kind=r()<0.6?cfg.mons[0]:cfg.mons[Math.floor(r()*cfg.mons.length)],pk=!!EN[kind].pack;if(pk)cnt=cap;
+  for(j=0;j<cnt;j++)fo.push((pk||r()<0.7)?kind:cfg.mons[Math.floor(r()*cfg.mons.length)]);
+  if(EN[fo[0]].pack&&fo.every(function(k){return k===fo[0]}))while(fo.length<cap)fo.push(fo[0]);
   feats.push({id:'m'+i,type:'mon',x:cand[i].x,y:cand[i].y,foes:fo})}
  return{grid:g,feats:feats,boss:{x:boss.x,y:boss.y},n:n}}
 //#GEN-END
 
 // ===== 存檔 =====
 var G;
-function fresh(){return{v:1,started:false,name:'',lv:1,xp:0,hp:100,sp:3,pts:60,items:{potion:2,fire:1,revive:0,stone:0},keys:0,ua:0,ud:0,loc:'inn',in:false,f:1,x:1,y:1,turn:0,seen:{},taken:{},slain:{},opened:{},guard:{},bound:[],steps:0,
+function fresh(){return{v:1,started:false,name:'',lv:1,xp:0,hp:100,mp:20,row:'f',pts:60,items:{potion:2,fire:1,revive:0,stone:0,antidote:0},keys:0,ua:0,ud:0,loc:'inn',in:false,f:1,x:1,y:1,turn:0,seen:{},taken:{},slain:{},opened:{},guard:{},bound:[],steps:0,
  roster:[],party:[],notes:[],processed:[],battle:null,run:null,dead:false,idle:0,auto:true,test:false,tourDone:false,cleared:false}}
-function load(){try{var t=localStorage.getItem(KEY);if(t){var o=JSON.parse(t);if(o&&o.v===1)return o}}catch(e){}return null}
+function load(){try{var t=localStorage.getItem(KEY);if(t){var o=JSON.parse(t);if(o&&o.v===1){if(o.mp==null){o.mp=20;o.row='f';o.roster=[];o.party=[];o.battle=null}return o}}}catch(e){}return null}
 G=load()||fresh();
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(G))}catch(e){}arm()}
-function mhp(){return 100+15*(G.lv-1)}
-function pdmg(){return 12+3*(G.lv-1)+3*(G.ua|0)}
-function parmor(){return 2+(G.ud|0)}
-function allyMax(a){return ALLY[a.style].hp+8*(G.lv-1)}
-function allyDmg(a){return ALLY[a.style].dmg+2*(G.lv-1)+3*(a.ua|0)}
-function allyArmor(a){return 3+(a.ud|0)}
+function tplOf(u){return u===G?D.HERO:D.COMP[u.name]}
+function st(u){var t=tplOf(u),l=(u.lv||1)-1,o={};['hp','mp','str','vit','int','mnd','agi'].forEach(function(k){o[k]=Math.round(t.base[k]+t.grow[k]*l)});
+ o.wpn=t.wpn+3*(u.ua|0);o.def=t.arm+(u.ud|0)+Math.floor(o.vit*.3);o.res=Math.floor(o.mnd*.3);return o}
+function mhp(){return st(G).hp}
+function mmp(){return st(G).mp}
+function pdmg(){var s=st(G);return s.wpn+s.str}
+function parmor(){return st(G).def}
 function person(n){return G.roster.find(function(r){return r.name===n})}
 function partyList(){return G.party.map(person).filter(Boolean)}
+function members(){return[G].concat(partyList())}
+function uname(u){return u===G?(G.name||'你'):u.name}
+function rowOf(u){return u.row||tplOf(u).row}
+function xpNeed(lv){return 30*lv}
+function addComp(nm){var t=D.COMP[nm];if(!t)return null;var p=person(nm);if(!p){p={name:nm,lv:t.lv,xp:0,row:t.row,ua:0,ud:0,state:'ok',bond:0};var s=st(p);p.hp=s.hp;p.mp=s.mp;G.roster.push(p)}return p}
+function fixRows(){['f','b'].forEach(function(r){var o=r==='f'?'b':'f',list=members().filter(function(u){return rowOf(u)===r});while(list.length>D.ROW_MAX)list.pop().row=o})}
+function joinParty(nm){var p=addComp(nm);if(!p)return'沒有這位同伴';if(G.party.indexOf(nm)>=0)return'';if(G.party.length>=D.PARTY_MAX)return'隊伍已滿';G.party.push(nm);fixRows();return''}
+function setRow(u,r){if(rowOf(u)===r)return'';if(members().filter(function(x){return rowOf(x)===r}).length>=D.ROW_MAX)return(r==='f'?'前衛':'後衛')+'已滿（最多 '+D.ROW_MAX+' 人）';u.row=r;return''}
+function gainXp(xp){var ups=[];members().forEach(function(u){var b=st(u),l0=u.lv;u.xp=(u.xp||0)+xp;while(u.xp>=xpNeed(u.lv)){u.xp-=xpNeed(u.lv);u.lv++}if(u.lv>l0){var a=st(u);u.hp+=a.hp-b.hp;u.mp+=a.mp-b.mp;ups.push(uname(u)+' Lv.'+u.lv)}});return ups}
 function note(t){G.notes.push(t);if(G.notes.length>8)G.notes.shift()}
 function newRun(){return{kills:{},pts:0,xp:0,items:{},pages:[],boss:[],downs:{},lost:[],deep:1,steps0:G.steps,lv0:G.lv,rests:0,bound:[]}}
 function R(){return G.run||(G.run=newRun())}
@@ -178,7 +194,7 @@ function addItem(k,n){var r=R();r.items[k]=(r.items[k]||0)+(n||1)}
 var FD={},CUR=null,BT=null,DL=[],DX=[0,1,0,-1],DY=[-1,0,1,0],DGMODE=null;
 function fd(f){return FD[f]||(FD[f]=genFloor(f))}
 function makeCur(f){var d=fd(f),g=d.grid.map(function(r){return r.slice()});
- for(var y=0;y<g.length;y++)for(var x=0;x<g.length;x++)if(g[y][x]==='D'&&G.opened[f+':'+x+','+y])g[y][x]='.';
+ for(var y=0;y<g.length;y++)for(var x=0;x<g.length;x++)if((g[y][x]==='D'||g[y][x]==='H')&&G.opened[f+':'+x+','+y])g[y][x]='.';
  if(!FL[f].boss||G.guard[f])g[d.boss.y][d.boss.x]='>';return g}
 function say(s){DL.unshift(s);if(DL.length>40)DL.length=40;upd()}
 function feAlive(f,ft){var k=f+':'+ft.id;if(ft.type==='mon')return !G.slain[k];if(ft.type==='boss')return !G.guard[f];return !G.taken[k]}
@@ -195,7 +211,8 @@ function moving(){return Math.abs(tx-px)>.05||Math.abs(ty-py)>.05||Math.abs(tang
 function tryMove(dx,dy){var nx=G.x+dx,ny=G.y+dy,c=CUR[ny]&&CUR[ny][nx];
  if(!c||c==='#'){say('前面是牆。');return}
  if(c==='D'){if(G.keys>0){G.keys--;G.opened[G.f+':'+nx+','+ny]=1;CUR[ny][nx]='.';say('鑰匙轉動，門開了。')}else say('門鎖住了，需要一把鑰匙。');persist();upd();return}
- var m=featAt(nx,ny,['mon','boss']);if(m){startBattle({type:m.type,id:m.id,foes:m.foes,ctx:'dg'});return}
+ if(c==='H'){G.opened[G.f+':'+nx+','+ny]=1;CUR[ny][nx]='.';say('你碰到的這面牆往下滑開了。後面是一個小房間——裡面擠滿了魔物。');persist();upd();return}
+ var m=featAt(nx,ny,['mon','boss','nest']);if(m){if(m.type==='boss'){bossAsk(m);return}startBattle({type:m.type,id:m.id,foes:m.foes,ctx:'dg'});return}
  G.x=nx;G.y=ny;tx=G.x+.5;ty=G.y+.5;G.steps++;reveal();
  if(CUR[G.y][G.x]==='>'&&!G.guard[G.f]&&!FL[G.f].boss)bindFloor();
  var it=featAt(G.x,G.y,['key','chest']);if(it){G.taken[G.f+':'+it.id]=1;pickup(it)}
@@ -209,17 +226,20 @@ function loot(good){var lv=lvOf(G.f),o=[],n=good?2:1;
 function pickup(it){
  if(it.type==='key'){G.keys++;say('撿到一把鑰匙。')}
  else if(it.type==='chest'){say('打開寶箱，得到：'+loot(it.good))}}
-function nearMon(){return fd(G.f).feats.some(function(ft){return(ft.type==='mon'||ft.type==='boss')&&feAlive(G.f,ft)&&Math.max(Math.abs(ft.x-G.x),Math.abs(ft.y-G.y))<=3})}
+function nearMon(){return fd(G.f).feats.some(function(ft){returnisFoeFt(ft)&&feAlive(G.f,ft)&&Math.max(Math.abs(ft.x-G.x),Math.abs(ft.y-G.y))<=3})}
 function act(a){if(!G.in||G.dead||BT||moving())return;var d=dir();
  switch(a){case'fwd':tryMove(DX[d],DY[d]);break;case'back':tryMove(-DX[d],-DY[d]);break;
  case'sl':tryMove(DX[(d+3)%4],DY[(d+3)%4]);break;case'sr':tryMove(DX[(d+1)%4],DY[(d+1)%4]);break;
  case'tl':G.turn--;turn=G.turn;tang=-Math.PI/2+turn*Math.PI/2;break;case'tr':G.turn++;turn=G.turn;tang=-Math.PI/2+turn*Math.PI/2;break}}
+var PB=null;
+function bossAsk(m){PB=m;modal('<div data-lock><h3>首領房前的等候室</h3><div class="mut">門後就是「'+esc(m.foes[0])+'」。首領房一次只進一隊，進去之後門會關上，打完之前出不來。</div>'+members().map(function(u){var s=st(u);return'<div class="row"><span>'+esc(uname(u))+'（'+(rowOf(u)==='f'?'前衛':'後衛')+'）</span><span>HP '+u.hp+'/'+s.hp+'｜MP '+u.mp+'/'+s.mp+'</span></div>'}).join('')+'<button class="btn amb" data-m="bossgo">推門進去</button><button class="btn" data-m="close">再準備一下</button></div>')}
+function isFoeFt(ft){return ft.type==='mon'||ft.type==='boss'||ft.type==='nest'}
 function onSpring(){return G.x===1&&G.y===1}
 function onStairs(){return CUR&&CUR[G.y]&&CUR[G.y][G.x]==='>'}
 
 // ===== 進出迷宮與探索紀錄 =====
 function bindFloor(){G.guard[G.f]=true;if(G.bound.indexOf(G.f)<0)G.bound.push(G.f);R().bound.push(FL[G.f].n);say('這一層已經記錄，之後可以從入口直接來到下一層。')}
-function healAll(){G.hp=mhp();G.sp=3;G.roster.forEach(function(a){if(a.state!=='dead'){a.hp=allyMax(a);a.state='ok'}})}
+function healAll(){G.hp=mhp();G.mp=mmp();G.roster.forEach(function(a){var s=st(a);a.hp=s.hp;a.mp=s.mp;a.state='ok'})}
 function itemName(k){return ITEM[k]?ITEM[k].n:k}
 function summary(ending){var r=R(),L=['【探索紀錄】'],f0=r.from||G.f;
  L.push('迷宮：'+DG[FL[f0].dg].n+'｜路線：第'+FL[f0].lv+'層→最深到第'+FL[r.deep].lv+'層｜走了 '+(G.steps-r.steps0)+' 步｜在入口休息 '+r.rests+' 次');
@@ -229,8 +249,8 @@ function summary(ending){var r=R(),L=['【探索紀錄】'],f0=r.from||G.f;
  var it=[];if(r.pts)it.push('納爾 +'+r.pts);Object.keys(r.items).forEach(function(n){it.push(itemName(n)+'×'+r.items[n])});if(r.xp)it.push('經驗 +'+r.xp);if(G.lv>r.lv0)it.push('升到 Lv.'+G.lv);
  L.push('收穫：'+(it.join('、')||'無'));
  if(r.fee)L.push('入場費：'+r.fee+' 納爾');
- var team=G.party.map(person).filter(Boolean).map(function(a){return a.name+(a.state==='injured'?'（重傷）':a.state==='dead'?'（已死）':r.downs[a.name]?'（途中倒地過）':'（正常）')}).join('、');
- if(team)L.push('同伴：'+team);if(r.lost.length)L.push('被留在迷宮裡的人：'+r.lost.join('、'));
+ var team=G.party.map(function(n){return n+(r.downs[n]?'（途中倒地過）':'（正常）')}).join('、');
+ if(team)L.push('同伴：'+team);if(r.nest)L.push('清掉了一間魔物房。');
  if(r.stone)L.push('離開方式：用掉一顆歸途石，直接回到地面。');
  L.push('離開時：生命 '+Math.max(0,G.hp)+'/'+mhp()+'。'+(ending||'從入口小房間的黑牆回到地面，已經休息回復。'));
  return L.join('\n')}
@@ -260,6 +280,7 @@ document.addEventListener('click',function(e){var b=e.target.closest('[data-m]')
  if(m==='surface2'){closeModal();exitDungeon();return}
  if(m==='descend'){closeModal();if(isLast(G.f)){modal('<h3>最深處</h3><div class="mut">'+(FL[G.f].dg==='po'?'再往下的樓層還沒有開放。':'這裡已經是迷宮的最深處。')+'</div><button class="btn" data-m="close">關閉</button>');return}
   enterFloor(G.f+1,'start');say('你們穿過黑牆，來到'+FL[G.f].n+'。');return}
+ if(m==='bossgo'){closeModal();if(PB)startBattle({type:'boss',id:PB.id,foes:PB.foes,ctx:'dg'});return}
  if(m==='sk'){closeModal();cmd(a);return}if(m==='skh'){closeModal();healPlayer(+a);return}if(m==='it'){useItem(a);return}if(m==='itt'){useItemOn(a,+b.dataset.t);return}
  if(m==='buy'){buy(a);return}if(m==='upg'){upgrade(a);return}
  if(m==='enter'){closeModal();enterDungeon(a);return}
@@ -270,106 +291,173 @@ document.addEventListener('click',function(e){var b=e.target.closest('[data-m]')
 // ===== 戰鬥 =====
 function startBattle(cfg){if(G.battle&&G.battle.pending&&BT)return;
  G.battle={pending:true,type:cfg.type,id:cfg.id||null,foes:cfg.foes.slice(),ctx:cfg.ctx,where:cfg.where||'',why:cfg.why||''};initBT();persist()}
+function mkUnit(u,i){var s=st(u),t=tplOf(u),me=u===G;
+ return{id:me?'P':'A'+i,ref:u,name:uname(u),side:me?'p':'a',job:t.job,row:rowOf(u),hp:Math.max(0,Math.min(u.hp,s.hp)),max:s.hp,mp:Math.max(0,Math.min(u.mp|0,s.mp)),mmp:s.mp,
+  str:s.str,int:s.int,mnd:s.mnd,agi:s.agi,wpn:s.wpn,armor:s.def,res:s.res,ranged:!!t.ranged,ai:t.ai||[],lv:u.lv,fx:{}}}
 function initBT(){var c=G.battle;
- var party=[{id:'P',name:G.name||'你',side:'p',hp:G.hp,max:mhp(),dmg:pdmg(),armor:parmor(),style:'主角'}];
- partyList().forEach(function(a,i){if(a.state==='dead')return;party.push({id:'A'+i,ref:a,name:a.name,side:'a',hp:Math.max(a.hp,a.state==='injured'?1:0),max:allyMax(a),dmg:allyDmg(a),armor:allyArmor(a),style:a.style,cd:0,sp:2})});
- var foes=c.foes.map(function(k,i){var t=enemyStat(k,c.ctx==='dg'?G.f:0);return{id:'E'+i,name:k,side:'e',hp:t.hp,max:t.hp,dmg:t.d,armor:t.arm||0,boss:!!t.boss,uniq:!!t.uniq,shape:t.shape,col:t.col,img:t.img}});
- BT={cfg:c,party:party,foes:foes,round:1,mode:'cmd',pending:null,log:['戰鬥開始！'],over:null};
+ var party=members().map(mkUnit);if(party[0].hp<=0)party[0].hp=1;
+ var foes=c.foes.map(function(k,i){var t=enemyStat(k,c.ctx==='dg'?G.f:0);return{id:'E'+i,name:k,side:'e',hp:t.hp,max:t.hp,dmg:t.d,armor:t.arm||0,res:0,agi:t.agi||7,boss:!!t.boss,uniq:!!t.uniq,shape:t.shape,col:t.col,img:t.img,weak:t.weak||[],tr:t,fx:{},n:0}});
+ BT={cfg:c,party:party,foes:foes,round:1,mode:'cmd',pending:null,log:['戰鬥開始！'],over:null,buff:null};
  if(c.type==='boss')say('你們踏進首領房——身後的門關上了。'+c.foes[0]+'轉了過來。');
+ if(c.type==='nest')say('小房間裡的魔物一起轉了過來。');
  TAB='dg';DGMODE=null;post({t:'want',open:true});render()}
-function liveF(){return BT.foes.filter(function(x){return x.hp>0})}
-function liveP(){return BT.party.filter(function(x){return x.hp>0})}
-function blog(s){BT.log.unshift(s);upd()}
-function hurt(a,d,mult,tag,pierce){var base=a.dmg*(mult||1)*rf(.85,1.15);if(a.side!=='e'&&BT.buff&&BT.buff.r>0)base*=1.25;if(d.def)base*=.5;var v=Math.max(1,Math.round(base-(pierce?0:d.armor)));d.hp-=v;
- blog((a.side==='p'?'你':a.name)+(tag||' 攻擊 ')+(d.side==='p'?'你':d.name)+'，造成 '+v+' 傷害');
- if(d.hp<=0){d.hp=0;blog((d.side==='p'?'你':d.name)+(d.side==='e'?' 倒下了':' 倒地了！'))}
- if(d.side==='p'||d.side==='a')flash=1;return v}
-function castFoe(u,id,tg){
- if(id==='str')hurt(u,tg,1.8,' 強擊 ');
- else if(id==='combo'){hurt(u,tg,.9,' 連擊 ');var t2=tg.hp>0?tg:liveF()[0];if(t2&&!BT.over)hurt(u,t2,.9,' 連擊 ')}
- else if(id==='pierce')hurt(u,tg,1.2,' 破甲攻擊 ',true)}
-function cheerOn(u){BT.buff={r:3};blog((u.side==='p'?'你':u.name)+' 鼓舞了全隊，傷害提高 25%')}
-function skillMenu(){var h='<h3>技能（氣力 '+G.sp+'/3）</h3>';
- SKO.forEach(function(k){var s2=SK[k],ok=G.lv>=s2.lv;h+='<button class="btn" data-m="sk" data-a="'+k+'" '+(ok&&G.sp>=s2.sp?'':'disabled')+'>'+(ok?'':'🔒 ')+s2.n+'（'+s2.sp+' 氣力）<div class="mut">'+(ok?s2.d:'Lv.'+s2.lv+' 解鎖')+'</div></button>'});
- h+='<button class="btn" data-m="close">取消</button>';modal(h)}
-function healMenu(){var h='<h3>治療誰？</h3>';BT.party.forEach(function(p,i){h+='<button class="btn" data-m="skh" data-a="'+i+'" '+(p.hp>0&&p.hp<p.max?'':'disabled')+'>'+esc(p.name)+'｜'+(p.hp>0?p.hp+'/'+p.max:'倒地')+'</button>'});h+='<button class="btn" data-m="close">取消</button>';modal(h)}
-function healPlayer(i){var p=BT.party[i],Pl=BT.party[0];if(!p||p.hp<=0||BT.mode==='busy')return;G.sp-=SK.heal.sp;Pl.def=false;var v=Math.round(p.max*.35);p.hp=Math.min(p.max,p.hp+v);blog('你治療了 '+(p.side==='p'?'自己':p.name)+'，回復 '+v+' 生命');endRound()}
-function allySkill(a){var lst=ASK[a.style]||[];
- for(var n=0;n<lst.length;n++){var id=lst[n],sk=SK[id];if(id==='heal'&&G.lv>=sk.lv&&(a.sp|0)<sk.sp&&liveP().some(function(p){return p.hp<p.max*.6}))return false;if(G.lv<sk.lv||(a.sp|0)<sk.sp)continue;var fs=liveF();if(!fs.length)return false;
-  if(id==='heal'){var low=liveP().filter(function(p){return p.hp<p.max*.6}).sort(function(x,y){return x.hp/x.max-y.hp/y.max})[0];if(!low)continue;a.sp-=sk.sp;var v=Math.round(low.max*.35);low.hp=Math.min(low.max,low.hp+v);blog(a.name+' 施展治療，'+(low.side==='p'?'你':low.name)+' 回復 '+v+' 生命');return true}
-  if(id==='cheer'){if(BT.buff&&BT.buff.r>0)continue;a.sp-=sk.sp;cheerOn(a);return true}
-  a.sp-=sk.sp;if(a.style==='盾手')a.taunt=true;castFoe(a,id,a.style==='弓手'?fs.slice().sort(function(x,y){return x.hp-y.hp})[0]:pick(fs));return true}
+function Pl(){return BT.party[0]}
+function alive(u){return u.hp>0}
+function able(u){return u.hp>0&&!u.fx.stone}
+function liveF(){return BT.foes.filter(alive)}
+function liveP(){return BT.party.filter(alive)}
+function frontP(){var a=liveP(),f=a.filter(function(u){return u.row==='f'});return f.length?f:a}
+function nm(u){return u.side==='p'?'你':u.name}
+function blog(s){BT.log.unshift(s);if(BT.log.length>60)BT.log.length=60;upd()}
+function fxIcons(u){return Object.keys(u.fx||{}).map(function(k){return D.FX[k].icon}).join('')}
+function addFx(tg,k){var F=D.FX[k];if(tg.hp<=0||tg.fx[k])return false;
+ if(tg.side==='e'&&tg.uniq&&D.BOSS_IMMUNE.indexOf(k)>=0){blog(nm(tg)+' 不受'+F.n+'影響');return false}
+ var dur=(tg.side==='e'&&F.foeDur)?F.foeDur:(F.dur||99);if(dur<90&&tg.acted===BT.round)dur++;
+ tg.fx[k]=dur;if(k==='stone'||k==='sleep'||k==='bind'){tg.chant=null;tg.charging=false}blog(nm(tg)+' 陷入'+F.n+'！');return true}
+function tryFx(tg,fx){if(fx&&Math.random()<fx.p)addFx(tg,fx.k)}
+function applyDmg(a,d,v,tag,weak){d.hp-=v;blog(nm(a)+tag+nm(d)+'，造成 '+v+' 傷害'+(weak?'（弱點！）':''));
+ if(d.fx.sleep&&d.hp>0){delete d.fx.sleep;blog(nm(d)+' 被打醒了')}
+ if(d.hp<=0){d.hp=0;d.fx={};d.chant=null;d.charging=false;blog(nm(d)+(d.side==='e'?' 倒下了':' 倒地了！'))}
+ if(d.side!=='e')flash=1;return v}
+function dealPhys(a,d,mult,tag,opt){opt=opt||{};var atk=a.side==='e'?a.dmg:(a.wpn+a.str),m=mult||1;
+ if(a.side!=='e'){if(BT.buff)m*=1.25;if(a.row==='b'&&!a.ranged)m*=D.BACK_MELEE}
+ if(d.fx.expose)m*=1+D.FX.expose.bonus;
+ var v=atk*m*rf(.85,1.15);if(d.def)v*=.5;v=Math.max(1,Math.round(v-(opt.pierce?0:d.armor)));
+ return applyDmg(a,d,v,tag||' 攻擊 ')}
+function dealMagic(a,d,base,elem,tag,mult){var pw=a.side==='e'?a.dmg*(mult||1):(base+a.int*D.MAGIC_INT),m=1,weak=false;
+ if(a.side!=='e'&&BT.buff)m*=1.25;if(elem&&d.weak&&d.weak.indexOf(elem)>=0){m*=D.WEAK;weak=true}if(d.fx.expose)m*=1+D.FX.expose.bonus;
+ var v=pw*m*rf(.9,1.1);if(d.def)v*=.5;v=Math.max(1,Math.round(v-(d.res||0)));
+ return applyDmg(a,d,v,tag,weak)}
+function healU(tg,v,by,tag){var b=tg.hp;tg.hp=Math.min(tg.max,tg.hp+Math.round(v));blog(nm(by)+tag+(tg===by?'自己':nm(tg))+'，回復 '+(tg.hp-b)+' 生命')}
+function lowest(th){return liveP().filter(function(p){return p.hp<p.max*th}).sort(function(a,b){return a.hp/a.max-b.hp/b.max})[0]}
+function afflicted(cures){return BT.party.filter(function(p){return p.hp>0&&cures.some(function(k){return p.fx[k]})})[0]}
+function strongest(){return liveF().slice().sort(function(a,b){return b.hp-a.hp})[0]}
+function pickFoe(pref){var fs=liveF();if(!fs.length)return null;if(pref&&pref.side==='e'&&pref.hp>0)return pref;return fs.slice().sort(function(a,b){return a.hp-b.hp})[0]}
+function useSkill(u,id,tg){var s=SK[id];if(!s||(s.mp&&u.mp<s.mp))return false;
+ switch(s.kind){
+ case'phys':{tg=pickFoe(tg);if(!tg)return false;u.mp-=s.mp;for(var h=0;h<(s.hits||1);h++){var t2=tg.hp>0?tg:liveF()[0];if(!t2)break;dealPhys(u,t2,s.mult,' 用'+s.n+'打向 ',{pierce:s.pierce});if(s.fx&&t2.hp>0)tryFx(t2,s.fx)}return true}
+ case'magic':{tg=pickFoe(tg);if(!tg)return false;u.mp-=s.mp;var el=s.elem;if(s.elems)el=s.elems.filter(function(e){return tg.weak.indexOf(e)>=0})[0]||s.elems[0];dealMagic(u,tg,s.base,el,' 的'+((s.names&&s.names[el])||s.n)+'擊中 ');return true}
+ case'magicall':{if(!liveF().length)return false;u.mp-=s.mp;blog(nm(u)+' 放出'+s.n+'！');liveF().forEach(function(f){dealMagic(u,f,s.base,s.elem,' 的'+s.n+'燒向 ')});return true}
+ case'heal':{tg=(tg&&tg.side!=='e'&&tg.hp>0)?tg:lowest(.999);if(!tg)return false;u.mp-=s.mp;healU(tg,s.pct?tg.max*s.pct:s.base+u.mnd*s.scale,u,' 用'+s.n+'治療 ');return true}
+ case'healall':{u.mp-=s.mp;blog(nm(u)+' 施展'+s.n);liveP().forEach(function(p){healU(p,s.base+u.mnd*s.scale,u,' 治療 ')});return true}
+ case'cure':{tg=tg||afflicted(s.cures);if(!tg)return false;u.mp-=s.mp;s.cures.forEach(function(k){delete tg.fx[k]});blog(nm(u)+' 用'+s.n+'解除了 '+(tg===u?'自己':nm(tg))+' 的異常狀態');return true}
+ case'taunt':{u.mp-=s.mp;u.fx.taunt=D.FX.taunt.dur;blog(nm(u)+' 大喝一聲，把敵人的注意力拉了過來');return true}
+ case'buff':{u.mp-=s.mp;BT.buff={r:s.dur};blog(nm(u)+' 鼓舞了全隊，傷害提高 25%');return true}
+ case'expose':{tg=pickFoe(tg||strongest());if(!tg||tg.fx.expose)return false;u.mp-=s.mp;tg.fx.expose=D.FX.expose.dur;blog(nm(u)+' 看破了 '+tg.name+' 的破綻，牠受到的傷害提高');return true}
+ case'coin':{tg=pickFoe(tg);if(!tg||G.pts<s.cost)return false;G.pts-=s.cost;applyDmg(u,tg,Math.max(1,Math.round((s.base+s.perLv*u.lv)*rf(.9,1.1))),' 抓起一把錢幣砸向 ');return true}}
  return false}
-function cmd(k,t){if(!BT||BT.over||BT.mode==='busy')return;var Pl=BT.party[0];
- if(k==='skill'){skillMenu();return}
- if(k==='heal'){if(G.lv<SK.heal.lv||G.sp<SK.heal.sp)return;healMenu();return}
- if(Pl.hp<=0){endRound();return}Pl.def=false;
- var sk=SK[k];
- if(k==='cheer'){if(G.lv<sk.lv||G.sp<sk.sp){blog('氣力不足（'+sk.n+'需要 '+sk.sp+'）');return}G.sp-=sk.sp;cheerOn(Pl);endRound()}
- else if(k==='atk'||(sk&&sk.t==='foe')){var fs=liveF();
-  if(sk&&(G.lv<sk.lv||G.sp<sk.sp)){blog('氣力不足（'+sk.n+'需要 '+sk.sp+'）');return}
+// 同伴自動行動：依序考慮 ai 清單裡的技能，都不適用就普通攻擊
+function allyAct(u){var fs=liveF();if(!fs.length)return;var big=BT.cfg.type!=='mon'||fs.length>=2;
+ for(var i=0;i<u.ai.length;i++){var id=u.ai[i],s=SK[id];if(!s||(s.mp&&u.mp<s.mp))continue;
+  if(s.kind==='heal'){var t=lowest(.55);if(t&&useSkill(u,id,t))return;continue}
+  if(s.kind==='healall'){if(liveP().filter(function(p){return p.hp<p.max*.6}).length>=3&&useSkill(u,id))return;continue}
+  if(s.kind==='cure'){var a=afflicted(s.cures);if(a&&useSkill(u,id,a))return;continue}
+  if(s.kind==='taunt'){if(!u.fx.taunt&&big&&useSkill(u,id))return;continue}
+  if(s.kind==='expose'){var sg=strongest();if(big&&sg&&!sg.fx.expose&&sg.hp>sg.max*.4&&useSkill(u,id,sg))return;continue}
+  if(s.kind==='coin'){if(big&&G.pts>=50&&useSkill(u,id))return;continue}
+  if(s.when==='armored'){var ar=fs.filter(function(f){return f.armor>0})[0];if(ar&&useSkill(u,id,ar))return;continue}
+  if(s.when==='afflicted'){var af=fs.filter(function(f){return f.fx.poison||f.fx.para||f.fx.bind})[0];if(af&&useSkill(u,id,af))return;continue}
+  if(s.when==='crowd'){if(fs.length>=3&&useSkill(u,id))return;continue}
+  if(s.kind==='magic'){if(useSkill(u,id))return;continue}
+  if(s.fx){var nf=fs.filter(function(f){return !f.fx[s.fx.k]})[0];if(big&&nf&&useSkill(u,id,nf))return;continue}
+  if(big&&useSkill(u,id))return}
+ dealPhys(u,pickFoe(),1,u.ranged?' 射向 ':' 攻擊 ')}
+// 敵人行動
+function targets(){var w=[];frontP().forEach(function(p){w.push(p);if(p.fx.taunt){w.push(p);w.push(p)}});return w}
+function foeAct(f){var lp=liveP();if(!lp.length)return;var tr=f.tr,r=BT.round;f.n++;
+ if(tr.sluggish&&f.n%2===1){blog(f.name+' 緩緩舉起手臂');return}
+ if(f.chant){f.chant=null;blog(f.name+' 的詠唱完成了！');dealMagic(f,pick(lp),0,tr.cast.elem,' 的'+tr.cast.n+'擊中 ',tr.cast.mult);return}
+ if(f.charging){f.charging=false;dealPhys(f,pick(targets()),tr.charge.mult,' 全力衝撞 ');return}
+ if(tr.cast&&f.n%2===1){f.chant=1;blog(f.name+' 開始詠唱，腳下浮現魔法陣');return}
+ if(tr.charge&&f.n%tr.charge.every===0){f.charging=true;blog(f.name+' 低下頭，蹄子刨著地面——');return}
+ if(tr.aoe&&f.n%tr.aoe.every===0){blog(f.name+' 放出'+tr.aoe.n+'！');lp.forEach(function(p){dealMagic(f,p,0,tr.aoe.elem,' 的'+tr.aoe.n+'落在 ',tr.aoe.mult)});return}
+ if(f.uniq&&r%3===0){blog(f.name+' 蓄足了力量——');lp.forEach(function(p){if(p.hp>0)dealPhys(f,p,.7,' 的攻擊掃過 ')});return}
+ var t=pick(targets()),mult=1,tag=' 攻擊 ';if(f.boss&&r%(f.uniq?4:3)===0){mult=f.uniq?1.6:1.7;tag=' 重擊 ';blog(f.name+' 猛然撲了上來——')}
+ var v=dealPhys(f,t,mult,tag);if(tr.drain&&f.hp>0){var b=f.hp;f.hp=Math.min(f.max,f.hp+Math.round(v*tr.drain));if(f.hp>b)blog(f.name+' 吸走了 '+(f.hp-b)+' 生命')}
+ if(tr.hit&&t.hp>0)tryFx(t,tr.hit)}
+// 回合：所有人依敏捷排序行動；主角的行動在輪到他時執行
+function canAct(u){if(u.fx.stone){blog(nm(u)+' 石化了，動不了');return false}if(u.fx.sleep){blog(nm(u)+' 睡著了');return false}if(u.fx.bind){blog(nm(u)+' 被纏住，動不了');return false}
+ if(u.fx.para){var F=D.FX.para;if(Math.random()<((u.side==='e'&&u.boss)?F.bossSkip:F.skip)){blog(nm(u)+' 身體麻痺，動不了');return false}}return true}
+function check(){if(!liveF().length){win();return true}if(!BT.party.some(able)){lose();return true}return false}
+function runRound(pact){if(!BT||BT.over)return;BT.mode='busy';upd();
+ var q=BT.party.concat(BT.foes).filter(alive).map(function(u){return{u:u,s:u.agi*(u.fx.slow?.5:1)+Math.random()*3}}).sort(function(a,b){return b.s-a.s}).map(function(o){return o.u});
+ var i=0,wait=!window.__fast;
+ (function go(){if(!BT||BT.over)return;
+  while(i<q.length&&q[i].hp<=0)i++;
+  if(i>=q.length){roundEnd();return}
+  var u=q[i++];u.acted=BT.round;
+  if(canAct(u)){if(u.side==='p')pact();else if(u.side==='a')allyAct(u);else foeAct(u)}
+  if(!BT||BT.over)return;if(check())return;
+  if(wait)setTimeout(go,300);else go()})()}
+function roundEnd(){BT.party.concat(BT.foes).forEach(function(u){if(u.hp<=0)return;
+  if(u.fx.poison){var F=D.FX.poison,v=Math.max(1,Math.round(u.max*((u.side==='e'&&u.boss)?F.bossRate:F.rate)));u.hp=Math.max(0,u.hp-v);blog(nm(u)+' 受到 '+v+' 毒傷害'+(u.hp<=0?(u.side==='e'?'，倒下了':'，倒地了！'):''));if(u.hp<=0){u.fx={};return}}
+  Object.keys(u.fx).forEach(function(k){if(u.fx[k]<90&&--u.fx[k]<=0){delete u.fx[k];if(k!=='taunt'&&k!=='expose')blog(nm(u)+' 的'+D.FX[k].n+'解除了')}})});
+ if(check())return;
+ if(BT.buff&&--BT.buff.r<=0){BT.buff=null;blog('鼓舞的效果消失了')}
+ BT.round++;BT.mode='cmd';blog('— 第 '+BT.round+' 回合 —');
+ if(BT.round>120){blog('雙方都打不動了。');fled();return}
+ if(!able(Pl())){blog('你無法行動，同伴繼續作戰。');runRound(function(){})}}
+// 主角指令
+function cmd(k,t){if(!BT||BT.over||BT.mode==='busy')return;var P0=Pl();
+ if(k==='skill'){skillMenu();return}if(k==='item'){itemMenu();return}
+ var s=SK[k];if(s&&P0.mp<s.mp){blog('MP 不足（'+s.n+'需要 '+s.mp+'）');return}
+ if(k==='atk'||(s&&s.kind==='phys')){var fs=liveF();
   if(fs.length>1&&t==null){BT.pending=k;BT.mode='tgt';upd();return}
-  var tg=t!=null?BT.foes[t]:fs[0];BT.mode='cmd';BT.pending=null;
-  if(sk){G.sp-=sk.sp;castFoe(Pl,k,tg)}else hurt(Pl,tg,1,' 攻擊 ');endRound()}
- else if(k==='def'){Pl.def=true;blog('你擺出防禦架勢，這回合受到的傷害減半');endRound()}
- else if(k==='item'){itemMenu()}
- else if(k==='flee'){
-  if(BT.cfg.type==='boss'){blog('首領房的門已經關上，逃不掉！');return}
-  if(Math.random()<(BT.cfg.ctx==='sf'?0.7:0.6)){fled()}else{blog('你想逃，但被擋住了！');endRound()}}}
-function itemMenu(){var h='<h3>道具</h3>',any=0;
- ['potion','fire','revive'].forEach(function(k){if(G.items[k]>0){any=1;h+='<button class="btn" data-m="it" data-a="'+k+'">'+ITEM[k].n+' ×'+G.items[k]+'<div class="mut">'+ITEM[k].note+'</div></button>'}});
- if(!any)h+='<div class="mut">沒有可用的道具。</div>';h+='<button class="btn" data-m="close">關閉</button>';modal(h)}
-function useItem(k){if(k==='fire'){closeModal();G.items.fire--;blog('你丟出火焰瓶！');liveF().forEach(function(f){var v=Math.max(1,22-f.armor);f.hp=Math.max(0,f.hp-v);blog(f.name+' 受到 '+v+' 火焰傷害'+(f.hp<=0?'，倒下了':''))});endRound();return}
- var h='<h3>對誰使用？</h3>';BT.party.forEach(function(p,i){var ok=k==='potion'?p.hp>0:p.hp<=0;h+='<button class="btn" data-m="itt" data-a="'+k+'" data-t="'+i+'" '+(ok?'':'disabled')+'>'+esc(p.name)+'｜'+(p.hp>0?p.hp+'/'+p.max:'倒地')+'</button>'});
+  var tg=t!=null?BT.foes[t]:fs[0];BT.pending=null;P0.def=false;
+  runRound(function(){var x=(tg&&tg.hp>0)?tg:liveF()[0];if(!x)return;if(s)useSkill(P0,k,x);else dealPhys(P0,x,1,' 攻擊 ')})}
+ else if(s&&s.kind==='heal'){healMenu(k)}
+ else if(s){P0.def=false;runRound(function(){useSkill(P0,k)})}
+ else if(k==='def'){P0.def=true;blog('你擺出防禦架勢，這回合受到的傷害減半');runRound(function(){})}
+ else if(k==='flee'){if(BT.cfg.type==='boss'){blog('首領房的門已經關上，逃不掉！');return}P0.def=false;
+  runRound(function(){if(Math.random()<(BT.cfg.type==='nest'?.4:.65))fled();else blog('你們想逃，但被擋住了！')})}}
+function skillMenu(){var P0=Pl(),h='<h3>技能（MP '+P0.mp+'/'+P0.mmp+'）</h3>';
+ SKO.forEach(function(k){var s=SK[k],ok=G.lv>=SKLV[k];h+='<button class="btn" data-m="sk" data-a="'+k+'" '+(ok&&P0.mp>=s.mp?'':'disabled')+'>'+(ok?'':'🔒 ')+s.n+'（MP '+s.mp+'）<div class="mut">'+(ok?s.d:'Lv.'+SKLV[k]+' 解鎖')+'</div></button>'});
  h+='<button class="btn" data-m="close">取消</button>';modal(h)}
-function useItemOn(k,i){closeModal();var p=BT.party[i];G.items[k]--;
- if(k==='potion'){p.hp=Math.min(p.max,p.hp+45);blog('回復藥讓 '+(p.side==='p'?'你':p.name)+' 回復了 45 生命')}
- else{p.hp=Math.round(p.max*.4);blog('甦醒藥把 '+(p.side==='p'?'你':p.name)+' 從地上拉了回來')}endRound()}
-function allyActs(){BT.party.forEach(function(a){if(a.side!=='a'||a.hp<=0||BT.over)return;var fs=liveF();if(!fs.length)return;if(allySkill(a))return;
- if(a.style==='盾手'){a.taunt=true;hurt(a,pick(fs),1,' 重擊 ')}
- else if(a.style==='弓手'){hurt(a,fs.slice().sort(function(x,y){return x.hp-y.hp})[0],1,' 射擊 ')}
- else if(a.style==='祭司'){a.cd--;var low=liveP().filter(function(p){return p.hp<p.max*.55}).sort(function(x,y){return x.hp/x.max-y.hp/y.max})[0];
-  if(low&&a.cd<=0){var h=18+4*G.lv;low.hp=Math.min(low.max,low.hp+h);a.cd=2;blog(a.name+' 為 '+(low.side==='p'?'你':low.name)+' 祈禱，回復 '+h)}else hurt(a,pick(fs),1,' 揮杖打向 ')}
- else{hurt(a,pick(fs),1,' 攻擊 ');if(Math.random()<.3){var s=pick(fs);s.stun=true;blog(a.name+' 的機關卡住了 '+s.name)}}})}
-function foeTargets(){var w=[];liveP().forEach(function(p){w.push(p);if(p.taunt)w.push(p)});return w}
-function foeActs(){BT.foes.forEach(function(f){if(f.hp<=0||BT.over)return;if(f.stun){f.stun=false;blog(f.name+' 動彈不得');return}
- if(!liveP().length)return;var tg=pick(foeTargets()),r=BT.round;
- if(f.uniq){if(r%3===0){blog(f.name+' 蓄足了力量——');liveP().forEach(function(p){hurt(f,p,.7,' 的攻擊掃過 ')})}else if(r%4===0)hurt(f,tg,1.6,' 重擊 ');else hurt(f,tg,1,' 攻擊 ')}
- else if(f.boss){if(r%3===0){blog(f.name+' 猛然撲了上來——');hurt(f,tg,1.7,' 重擊 ')}else hurt(f,tg,1,' 攻擊 ')}
- else hurt(f,tg,1,' 攻擊 ')})}
-function endRound(){if(!BT||BT.over)return;BT.mode='busy';upd();var wait=!window.__fast;
- var steps=[function(){if(!liveF().length)return win();allyActs()},function(){if(!liveF().length)return win();foeActs()},function(){
-  if(!liveP().length)return lose();BT.party.forEach(function(p){p.taunt=false;if(p.side==='a'&&p.sp<3)p.sp++});if(BT.buff){BT.buff.r--;if(BT.buff.r<=0){BT.buff=null;blog('鼓舞的效果消失了')}}BT.round++;G.sp=Math.min(3,G.sp+1);BT.mode='cmd';blog('— 第 '+BT.round+' 回合 —')}];
- var i=0;(function go(){if(!BT||BT.over)return;steps[i++]();if(!BT||BT.over)return;if(i<steps.length){if(wait)setTimeout(go,380);else go()}})()}
-function sync(){var Pl=BT.party[0];G.hp=Math.max(Pl.hp,0);BT.party.forEach(function(p){if(p.ref)p.ref.hp=p.hp})}
-function noteDowns(){BT.party.forEach(function(p){if(p.ref&&p.hp<=0)R().downs[p.name]=true})}
+function healMenu(k){BT.healSk=k;var h='<h3>治療誰？</h3>';BT.party.forEach(function(p,i){h+='<button class="btn" data-m="skh" data-a="'+i+'" '+(p.hp>0&&p.hp<p.max?'':'disabled')+'>'+esc(p.name)+'｜'+(p.hp>0?p.hp+'/'+p.max:'倒地')+'</button>'});h+='<button class="btn" data-m="close">取消</button>';modal(h)}
+function healPlayer(i){var p=BT.party[i],P0=Pl(),k=BT.healSk||'heal';if(!p||p.hp<=0||BT.mode==='busy')return;P0.def=false;runRound(function(){useSkill(P0,k,p)})}
+var BITEMS=['potion','fire','revive','antidote'];
+function itemMenu(){var h='<h3>道具</h3>',any=0;
+ BITEMS.forEach(function(k){if(G.items[k]>0){any=1;h+='<button class="btn" data-m="it" data-a="'+k+'">'+ITEM[k].n+' ×'+G.items[k]+'<div class="mut">'+ITEM[k].note+'</div></button>'}});
+ if(!any)h+='<div class="mut">沒有可用的道具。</div>';h+='<button class="btn" data-m="close">關閉</button>';modal(h)}
+function useItem(k){var P0=Pl();if(!(G.items[k]>0))return;
+ if(k==='fire'){closeModal();P0.def=false;runRound(function(){G.items.fire--;blog('你丟出火焰瓶！');liveF().forEach(function(f){var w=f.weak.indexOf('火')>=0;applyDmg(P0,f,Math.round(22*(w?D.WEAK:1)),' 的火焰燒到 ',w)})});return}
+ var h='<h3>對誰使用？</h3>';BT.party.forEach(function(p,i){var ok=k==='potion'?p.hp>0&&p.hp<p.max:k==='revive'?p.hp<=0:(p.hp>0&&(p.fx.poison||p.fx.para));h+='<button class="btn" data-m="itt" data-a="'+k+'" data-t="'+i+'" '+(ok?'':'disabled')+'>'+esc(p.name)+'｜'+(p.hp>0?p.hp+'/'+p.max:'倒地')+' '+fxIcons(p)+'</button>'});
+ h+='<button class="btn" data-m="close">取消</button>';modal(h)}
+function useItemOn(k,i){closeModal();var p=BT.party[i],P0=Pl();if(!p||!(G.items[k]>0))return;P0.def=false;
+ runRound(function(){G.items[k]--;
+  if(k==='potion'){if(p.hp>0)healU(p,45,P0,' 用回復藥治療 ')}
+  else if(k==='revive'){if(p.hp<=0){p.hp=Math.round(p.max*.4);blog('甦醒藥把 '+nm(p)+' 從地上拉了回來')}}
+  else{delete p.fx.poison;delete p.fx.para;blog('解毒藥解除了 '+nm(p)+' 的中毒與麻痺')}})}
+// 戰鬥結束
+function sync(){BT.party.forEach(function(p){p.ref.hp=Math.max(0,p.hp);p.ref.mp=Math.max(0,p.mp)})}
+function standUp(){members().forEach(function(u){if(u.hp<=0)u.hp=1})}
+function noteDowns(){BT.party.forEach(function(p){if(p.side==='a'&&p.hp<=0)R().downs[p.name]=true})}
 function finishBt(){G.battle=null;BT=null;DGMODE=null;persist();var e=document.getElementById('en');if(e)e.innerHTML=''}
 function surfaceReport(res,extra){var c=BT.cfg,cnt={};BT.foes.forEach(function(f){cnt[f.name]=(cnt[f.name]||0)+1});
  var team=BT.party.slice(1).map(function(p){return p.name+(p.hp<=0?'（倒地）':'')}).join('、');
  return '【戰鬥結果】地面｜'+(c.where||LOC[G.loc])+'｜結果：'+res+'\n敵人：'+Object.keys(cnt).map(function(k){return k+'×'+cnt[k]}).join('、')+'\n你的生命：'+G.hp+'/'+mhp()+(team?'\n同伴：'+team:'')+(extra?'\n'+extra:'')}
-function win(){BT.over='win';sync();var c=BT.cfg,xp=0,pts=0,k={};BT.foes.forEach(function(f){var t=enemyStat(f.name,c.ctx==='dg'?G.f:0);xp+=t.xp;pts+=t.pts;k[f.name]=(k[f.name]||0)+1});
- G.xp+=xp;G.pts+=pts;var lv0=G.lv;while(G.xp>=30*G.lv){G.xp-=30*G.lv;G.lv++;G.hp+=15}
- BT.party.forEach(function(p){if(p.ref&&p.hp<=0){p.ref.hp=1;p.ref.state='injured'}});if(G.hp<=0)G.hp=1;
+function win(){BT.over='win';sync();var c=BT.cfg,xp=0,pts=0,k={};BT.foes.forEach(function(f){xp+=f.tr.xp;pts+=f.tr.pts;k[f.name]=(k[f.name]||0)+1});
+ if(c.ctx==='dg')noteDowns();standUp();G.pts+=pts;var ups=gainXp(xp);
  var drop='';if(Math.random()<.25){G.items.potion++;drop='，撿到一瓶回復藥'}
- var msg='戰勝！經驗 +'+xp+'、納爾 +'+pts+drop+(G.lv>lv0?'　⬆ 升到 Lv.'+G.lv:'');
- if(c.ctx==='dg'){noteDowns();var r=R();r.pts+=pts;r.xp+=xp;if(drop)addItem('potion');Object.keys(k).forEach(function(n){r.kills[n]=(r.kills[n]||0)+k[n]});
-  G.slain[G.f+':'+c.id]=1;
+ var gain='經驗 +'+xp+'、納爾 +'+pts+drop+(ups.length?'　⬆ '+ups.join('、'):''),msg='戰勝！'+gain;
+ if(c.ctx==='dg'){var r=R();r.pts+=pts;r.xp+=xp;if(drop)addItem('potion');Object.keys(k).forEach(function(n){r.kills[n]=(r.kills[n]||0)+k[n]});
+  if(c.type==='nest'){G.taken[G.f+':'+c.id]=1;r.nest=(r.nest||0)+1;msg+='。魔物房清空了，在角落找到：'+loot(true)}
+  else G.slain[G.f+':'+c.id]=1;
   if(c.type==='boss'){G.guard[G.f]=true;delete G.slain[G.f+':'+c.id];if(G.bound.indexOf(G.f)<0)G.bound.push(G.f);CUR[fd(G.f).boss.y][fd(G.f).boss.x]='>';r.boss.push(c.foes[0]);r.bound.push(FL[G.f].n);
-   msg+='。首領倒下了，對面的門打開，露出通往下一層的黑牆。'}
+   msg+='。首領倒下了，對面的門打開，露出通往下一層的黑牆。';
+   if(Math.random()<.25){var ex=lvOf(G.f)*40;G.pts+=ex;r.pts+=ex;msg+='房間角落散著前一支隊伍留下的裝備，換得 '+ex+' 納爾。'}}
   setTimeout(function(){finishBt();say(msg)},900)}
- else{var txt=surfaceReport('勝利','獎勵：經驗 +'+xp+'、納爾 +'+pts+drop+(G.lv>lv0?'、升到 Lv.'+G.lv:''));
-  setTimeout(function(){finishBt();sendOut(txt)},900)}}
+ else{var txt=surfaceReport('勝利','獎勵：'+gain);setTimeout(function(){finishBt();sendOut(txt)},900)}}
 function fled(){BT.over='fled';sync();var c=BT.cfg;
- if(c.ctx==='dg'){var lost=[];BT.party.forEach(function(p){if(p.ref&&p.hp<=0){p.ref.state='dead';lost.push(p.name);R().lost.push(p.name)}});
-  if(G.hp<=0)G.hp=1;var d=dir(),bx=G.x-DX[d],by=G.y-DY[d];if(CUR[by]&&CUR[by][bx]&&CUR[by][bx]!=='#'&&CUR[by][bx]!=='D'){G.x=bx;G.y=by;tx=G.x+.5;ty=G.y+.5}
-  setTimeout(function(){finishBt();say('你們逃走了。'+(lost.length?lost.join('、')+' 被留在原地，迷宮慢慢把他們吞了下去。':''))},500)}
- else{BT.party.forEach(function(p){if(p.ref&&p.hp<=0){p.ref.hp=1;p.ref.state='injured'}});if(G.hp<=0)G.hp=1;var txt=surfaceReport('逃走了');setTimeout(function(){finishBt();sendOut(txt)},500)}}
-function lose(){BT.over='lose';sync();var c=BT.cfg;
- if(c.ctx==='dg'){G.dead=true;noteDowns();var txt=summary('全隊覆沒，沒有人能回到地面。本局結束。');G.hp=0;
-  setTimeout(function(){finishBt();modal('<div data-lock><h3>全滅</h3><div class="mut">最後一個人倒下了。迷宮安靜了一會兒，然後開始消化。</div><button class="btn amb" data-m="lostclose">看結局</button></div>');window.__lostTxt=txt},700)}
- else{G.hp=1;BT.party.forEach(function(p){if(p.ref&&p.hp<=0){p.ref.hp=1;p.ref.state='injured'}});var loss=Math.floor(G.pts*0.3);G.pts-=loss;var txt=surfaceReport('戰敗',(loss?'損失納爾 '+loss+'。':'')+'你被打倒了，但沒有死，醒來時傷得很重。');setTimeout(function(){finishBt();sendOut(txt)},700)}}
-document.addEventListener('click',function(e){var b=e.target.closest('[data-m="lostclose"]');if(!b)return;closeModal();var t=window.__lostTxt||'';G.in=false;persist();DGMODE=null;sendOut(t)});
-
+ if(c.ctx==='dg'){noteDowns();standUp();var d=dir(),bx=G.x-DX[d],by=G.y-DY[d],cc=CUR[by]&&CUR[by][bx];if(cc&&cc!=='#'&&cc!=='D'&&cc!=='H'){G.x=bx;G.y=by;tx=G.x+.5;ty=G.y+.5}
+  setTimeout(function(){finishBt();say('你們逃走了，倒地的人也被拖了出來。')},500)}
+ else{standUp();var txt=surfaceReport('逃走了');setTimeout(function(){finishBt();sendOut(txt)},500)}}
+function lose(){BT.over='lose';sync();var c=BT.cfg,loss=Math.floor(G.pts*.3);G.pts-=loss;
+ if(c.ctx==='dg'){noteDowns();standUp();R().wipe=1;var txt=summary('全隊倒下。路過的探索者把你們拖回了地面，身上的納爾少了 '+loss+'。');
+  setTimeout(function(){finishBt();window.__lostTxt=txt;modal('<div data-lock><h3>全隊倒下</h3><div class="mut">最後一個人也倒了。醒來時，你們躺在迷宮入口外面——有別的隊伍把你們拖了出來，順手拿走了 '+loss+' 納爾當謝禮。</div><button class="btn amb" data-m="lostclose">回到地面</button></div>')},700)}
+ else{standUp();var txt2=surfaceReport('戰敗',(loss?'損失納爾 '+loss+'。':'')+'你們被打倒了，醒來時傷得很重。');setTimeout(function(){finishBt();sendOut(txt2)},700)}}
+function wipeOut(){var t=window.__lostTxt||'';G.loc=DG[FL[G.f].dg].gate;G.in=false;healAll();G.run=null;persist();DGMODE=null;sendOut(t)}
+document.addEventListener('click',function(e){var b=e.target.closest('[data-m="lostclose"]');if(!b)return;closeModal();wipeOut()});
 // ===== 地面事件與購物 =====
 function buy(a){if(G.in||BT||SHOPS.indexOf(G.loc)<0){toast('要在探索者公會或商人公會才能買補給');return}var it=ITEM[a];if(!it||!it.c)return;if(G.pts<it.c){toast('納爾不足');return}G.pts-=it.c;G.items[a]=(G.items[a]||0)+1;note('買了'+it.n);persist();render()}
 function upTarget(i){return i<0?G:G.roster[i]}
@@ -386,12 +474,10 @@ function apply(ev){var t=ev&&ev.type;
  case'gift':{var k=String(ev.item||''),nn=clamp(parseInt(ev.n,10)||1,1,2);if(k==='potion'||k==='fire'){G.items[k]+=nn;return itemName(k)+'×'+nn}throw new Error('不能給這個道具')}
  case'go':{if(G.in)return null;if(LOC[ev.place]){G.loc=ev.place;return'前往'+LOC[ev.place]}throw new Error('未知地點')}
  case'open':{var OT={stat:'⌚ 查看狀態',shop:'🛒 打開商店',dg:'🧭 迷宮'},tb=String(ev.tab||'stat');if(!OT[tb])tb='stat';ST.go={tab:tb,label:OT[tb]};return''}
- case'ally_join':{var nm=String(ev.name||'').trim().slice(0,12);if(!nm)throw new Error('同伴沒有名字');var p=person(nm);if(p&&p.state==='dead')throw new Error(nm+'已死亡');
-  if(G.party.indexOf(nm)>=0)return null;if(G.party.length>=3)throw new Error('隊伍已滿，'+nm+'無法加入');
-  if(!p){var st=ALLY[ev.style]?ev.style:(CORE[nm]||'盾手');p={name:nm,style:st,bond:clamp(parseInt(ev.bond,10)||0,0,3),hp:0,state:'ok'};p.hp=allyMax(p);G.roster.push(p)}
-  G.party.push(nm);return nm+' 加入隊伍'}
+ case'ally_join':{var nm=String(ev.name||'').trim();if(!D.COMP[nm])throw new Error('沒有這位同伴：'+nm);if(G.party.indexOf(nm)>=0)return null;
+  var er=joinParty(nm);if(er==='隊伍已滿')return nm+' 加入（隊伍已滿，先待命）';if(er)throw new Error(er);return nm+' 加入隊伍'}
  case'ally':{var a=person(String(ev.name||''));if(!a)throw new Error('名冊沒有 '+ev.name);var out=[];
-  if(ev.bond!=null){var b=typeof ev.bond==='string'?BOND.indexOf(ev.bond):parseInt(ev.bond,10);if(b>=0&&b<=3){a.bond=b;out.push('好感 '+BOND[b])}}
+  if(ev.bond!=null){var b=typeof ev.bond==='string'?BOND.indexOf(ev.bond):parseInt(ev.bond,10);if(b>=0&&b<BOND.length){a.bond=b;out.push(BOND[b])}}
   return a.name+'：'+(out.join('、')||'已更新')}
  case'ally_leave':{var n2=String(ev.name||'');G.party=G.party.filter(function(n){return n!==n2});return n2+' 離開隊伍'}
  case'battle':{if(G.in||G.dead)throw new Error('現在不能開戰');var foes=[];(Array.isArray(ev.enemies)?ev.enemies:[]).forEach(function(e){var k=String(e.k||e.kind||e.name||'地痞'),n=clamp(parseInt(e.n,10)||1,1,4);for(var i=0;i<n&&foes.length<5;i++)foes.push(k)});
@@ -410,10 +496,10 @@ function ingest(text){if(!G.started)return{status:'nosave',msg:'探索手帳尚�
 
 // ===== 與載入器溝通 =====
 function post(m){if(P)try{P.postMessage(Object.assign({lt:1},m),'*')}catch(e){}}
-function compact(){var o={'位置':G.in?'迷宮：'+FL[G.f].n:LOC[G.loc],'等級':G.lv,'生命':G.hp+'/'+mhp(),'納爾':G.pts,'攻擊強化':(G.ua|0),'防禦強化':(G.ud|0)};
+function compact(){var o={'位置':G.in?'迷宮：'+FL[G.f].n:LOC[G.loc],'等級':G.lv,'生命':G.hp+'/'+mhp(),'MP':G.mp+'/'+mmp(),'站位':rowOf(G)==='f'?'前衛':'後衛','納爾':G.pts,'攻擊強化':(G.ua|0),'防禦強化':(G.ud|0)};
  var it={};Object.keys(ITEM).forEach(function(k){if(G.items[k])it[ITEM[k].n]=G.items[k]});if(Object.keys(it).length)o['道具']=it;
- o['隊伍']=partyList().map(function(p){return{'名':p.name,'風格':p.style,'好感':BOND[p.bond],'攻強':(p.ua|0),'防強':(p.ud|0),'狀態':p.state==='ok'?'正常':p.state==='injured'?'重傷':'死亡'}});
- var dead=G.roster.filter(function(r){return r.state==='dead'});if(dead.length)o['已死亡']=dead.map(function(p){return p.name});
+ o['隊伍']=partyList().map(function(p){var s=st(p),t=tplOf(p);return{'名':p.name,'職業':t.job,'等級':p.lv,'站位':rowOf(p)==='f'?'前衛':'後衛','生命':p.hp+'/'+s.hp,'契約':BOND[p.bond|0]}});
+ var wait=G.roster.filter(function(r){return G.party.indexOf(r.name)<0});if(wait.length)o['待命同伴']=wait.map(function(p){return p.name});
  if(G.bound.length)o['已打倒首領的樓層']=G.bound.map(function(f){return FL[f].n});
  o['技能']=learned();
  if(G.notes.length)o['新事件']=G.notes.slice();if(G.dead)o['狀態']='全隊覆沒，本局結束';return o}
@@ -442,7 +528,7 @@ function tabDot(k){if(k!==TAB)dots[k]=1}
 function toast(t){var el=$('toast');el.textContent=t;el.classList.add('on');clearTimeout(toast._t);toast._t=setTimeout(function(){el.classList.remove('on')},2600)}
 function setTab(k){TAB=k;delete dots[k];if(k!=='dg')DGMODE=null;render();$('view').scrollTop=0}
 function chips(){if(!G.started){$('chips').innerHTML='<span class="chip">尚未啟用</span>';return}
- var c='<span class="chip hp">生命 '+G.hp+'/'+mhp()+'</span><span class="chip pt">納爾 '+G.pts+'</span><span class="chip">Lv.'+G.lv+'</span>';
+ var c='<span class="chip hp">生命 '+G.hp+'/'+mhp()+'</span><span class="chip">MP '+G.mp+'/'+mmp()+'</span><span class="chip pt">納爾 '+G.pts+'</span><span class="chip">Lv.'+G.lv+'</span>';
  c+='<span class="chip">'+(G.in?FL[G.f].n:LOC[G.loc])+'</span>';if(G.dead)c='<span class="chip bad">本局結束</span>'+c;$('chips').innerHTML=c}
 function avatarHtml(p){var ch=esc((p&&p.name||'?').slice(0,1));return'<div class="av">'+ch+'</div>'}
 // ===== 劇情頁 =====
@@ -486,23 +572,27 @@ function storySay(text,free){text=(text||'').trim();if(!text)return;if(ST.busy){
  if(G.dead){toast('本局已結束');return}if(!G.started){toast('請先啟用探索手帳');return}if(G.in){toast('迷宮中不能和 AI 對話');return}
  ST.evs=[];ST.res='';ST.go=null;ST.busy=true;persist();post({t:'fill',text:text,send:true,keep:true});if(!P){toast('（測試模式）'+text);ST.busy=false}if(TAB==='story')render()}
 // ===== 其他分頁 =====
-function statHtml(){var h='';if(G.dead)h+='<div class="card dead">全隊覆沒，這一局已經結束。</div>';
- h+='<h3>你</h3><div class="card"><div class="row"><span>名字</span><b>'+esc(G.name)+'</b></div><div class="row"><span>等級</span><span>Lv.'+G.lv+'（經驗 '+G.xp+'/'+30*G.lv+'）</span></div><div class="row"><span>生命</span><span>'+G.hp+' / '+mhp()+'</span></div><div class="bar"><i style="width:'+Math.round(G.hp/mhp()*100)+'%"></i></div><div class="row"><span>納爾</span><b style="color:var(--amb)">'+G.pts+'</b></div><div class="row"><span>攻擊強化</span><span>Lv.'+(G.ua|0)+'（傷害 '+pdmg()+'）</span></div><div class="row"><span>防禦強化</span><span>Lv.'+(G.ud|0)+'（減傷 '+parmor()+'）</span></div></div>';
+function memberRow(u){var me=u===G,s=st(u),t=tplOf(u),r=rowOf(u),key=me?'@':u.name,lock=(G.in||BT)?' disabled':'';
+ return'<div class="ally">'+avatarHtml({name:uname(u)})+'<div style="flex:1"><b>'+esc(uname(u))+'</b><span class="tag">'+esc(t.job)+'</span><span class="tag">Lv.'+u.lv+'</span>'+(me?'':'<span class="tag">'+BOND[u.bond|0]+'</span>')+
+  '<div class="mut">HP '+u.hp+'/'+s.hp+'｜MP '+u.mp+'/'+s.mp+'｜攻 '+(s.wpn+s.str)+'｜防 '+s.def+'｜敏 '+s.agi+'</div>'+
+  '<button class="btn sm'+(r==='f'?' amb':'')+'" data-act="row" data-arg="'+esc(key)+':f">前衛</button><button class="btn sm'+(r==='b'?' amb':'')+'" data-act="row" data-arg="'+esc(key)+':b">後衛</button>'+
+  (me?'':'<button class="btn sm" data-act="leave" data-arg="'+esc(u.name)+'"'+lock+'>離隊待命</button>')+'</div></div>'}
+function waitRow(p){var s=st(p),t=tplOf(p);return'<div class="ally">'+avatarHtml(p)+'<div style="flex:1"><b>'+esc(p.name)+'</b><span class="tag">'+esc(t.job)+'</span><span class="tag">Lv.'+p.lv+'</span><div class="mut">HP '+p.hp+'/'+s.hp+'｜MP '+p.mp+'/'+s.mp+'</div><button class="btn sm" data-act="join" data-arg="'+esc(p.name)+'"'+((G.in||BT||G.party.length>=D.PARTY_MAX)?' disabled':'')+'>編入隊伍</button></div></div>'}
+function statHtml(){var h='',s=st(G);
+ h+='<h3>你</h3><div class="card"><div class="row"><span>名字</span><b>'+esc(G.name)+'</b></div><div class="row"><span>等級</span><span>Lv.'+G.lv+'（經驗 '+G.xp+'/'+xpNeed(G.lv)+'）</span></div><div class="row"><span>生命</span><span>'+G.hp+' / '+s.hp+'</span></div><div class="bar"><i style="width:'+Math.round(G.hp/s.hp*100)+'%"></i></div><div class="row"><span>MP</span><span>'+G.mp+' / '+s.mp+'</span></div><div class="row"><span>納爾</span><b style="color:var(--amb)">'+G.pts+'</b></div><div class="row"><span>能力</span><span>腕力 '+s.str+'｜體力 '+s.vit+'｜知力 '+s.int+'｜精神 '+s.mnd+'｜敏捷 '+s.agi+'</span></div><div class="row"><span>攻擊強化</span><span>Lv.'+(G.ua|0)+'（攻擊 '+pdmg()+'）</span></div><div class="row"><span>防禦強化</span><span>Lv.'+(G.ud|0)+'（防禦 '+parmor()+'）</span></div></div>';
  h+='<h3>道具</h3><div class="card">';var any=0;Object.keys(ITEM).forEach(function(k){if(G.items[k]){any=1;h+='<div class="row"><span>'+ITEM[k].n+'</span><span>×'+G.items[k]+'</span></div>'}});if(!any)h+='<div class="mut">沒有道具。</div>';h+='</div>';
- h+='<h3>技能（全員通用，等級解鎖）</h3><div class="card">'+SKO.map(function(k){var s2=SK[k],ok=G.lv>=s2.lv;return'<div class="row"><span>'+(ok?'':'🔒 ')+s2.n+'（'+s2.sp+'）</span><span>'+(ok?s2.d:'Lv.'+s2.lv+' 解鎖')+'</span></div>'}).join('')+'</div>';
- h+='<h3>隊伍（'+G.party.length+'/3）</h3><div class="card">';var pl=partyList();if(!pl.length)h+='<div class="mut">目前一個人行動。在劇情裡邀請同伴，對方答應後會出現在這裡。</div>';
- pl.forEach(function(p){h+=allyRow(p)});h+='</div>';
- var others=G.roster.filter(function(r){return G.party.indexOf(r.name)<0});if(others.length){h+='<h3>認識的人</h3><div class="card">';others.forEach(function(p){h+=allyRow(p)});h+='</div>'}
+ h+='<h3>技能</h3><div class="card">'+SKO.map(function(k){var s2=SK[k],ok=G.lv>=SKLV[k];return'<div class="row"><span>'+(ok?'':'🔒 ')+s2.n+'（MP '+s2.mp+'）</span><span>'+(ok?s2.d:'Lv.'+SKLV[k]+' 解鎖')+'</span></div>'}).join('')+'</div>';
+ h+='<h3>隊伍（'+(G.party.length+1)+'/'+(D.PARTY_MAX+1)+'）</h3><div class="mut">前衛、後衛各最多 '+D.ROW_MAX+' 人。近戰的敵人只打得到前衛；站後衛用近戰武器攻擊，傷害只有六成。</div><div class="card">'+members().map(memberRow).join('')+'</div>';
+ var others=G.roster.filter(function(r){return G.party.indexOf(r.name)<0});if(others.length)h+='<h3>待命的同伴</h3><div class="card">'+others.map(waitRow).join('')+'</div>';
  h+='<h3>迷宮進度</h3><div class="card">'+Object.keys(DG).map(function(k){var fs=dgFloors(k),n=fs.filter(function(f){return G.guard[f]}).length;return'<div class="row"><span>'+DG[k].n+'</span><span>已打倒首領 '+n+' / '+fs.length+' 層</span></div>'}).join('')+'</div>';
  return h}
-function allyRow(p){return'<div class="ally">'+avatarHtml(p)+'<div style="flex:1"><b>'+esc(p.name)+'</b><span class="tag">'+esc(p.style)+'</span><span class="tag">'+BOND[p.bond]+'</span><span class="tag '+(p.state==='ok'?'ok':'bad')+'">'+(p.state==='ok'?'正常':p.state==='injured'?'重傷':'死亡')+'</span><div class="mut">生命 '+p.hp+'/'+allyMax(p)+'｜攻擊強化 '+(p.ua|0)+'｜防禦強化 '+(p.ud|0)+'</div></div></div>'}
 function shopHtml(){if(G.in)return'<div class="card mut">你在迷宮裡，商店只能在地面使用。</div>';var h='';
  if(SHOPS.indexOf(G.loc)>=0){h+='<h3>'+LOC[G.loc]+'・補給品</h3><div class="card">'+Object.keys(ITEM).map(function(k){return shopRow(ITEM[k].n+'（持有 '+(G.items[k]||0)+'）',ITEM[k].note,ITEM[k].c,k)}).join('')+'</div><div class="mut">買了什麼，AI 會在你下次說話時知道。</div>'}
  else if(G.loc===D.SMITH){h+='<h3>殘火工坊・強化</h3><div class="mut">花納爾強化武器與護具。每次攻擊 +3 傷害、防禦 +1 減傷，每項最高 Lv.'+UPMAX+'。</div>';
   h+='<div class="card">'+upRow(-1)+G.roster.map(function(r,i){return r.state==='dead'?'':upRow(i)}).join('')+'</div>'}
  else h+='<div class="card mut">這裡沒有商店。補給品在「'+LOC.hguild+'」或「'+LOC.pmarket+'」，裝備強化在「'+LOC.smith+'」。</div>';
  return h}
-function upRow(i){var t=upTarget(i),nm=i<0?(G.name||'你'):t.name,a=t.ua|0,d=t.ud|0,h='<div style="padding:6px 0;border-top:1px solid var(--line)"><b>'+esc(nm)+'</b>'+(i>=0?'<span class="tag">'+esc(t.style)+'</span>':'')+'<div class="mut">攻擊 Lv.'+a+'/'+UPMAX+'　防禦 Lv.'+d+'/'+UPMAX+'</div><div class="btns">';
+function upRow(i){var t=upTarget(i),nm=i<0?(G.name||'你'):t.name,a=t.ua|0,d=t.ud|0,h='<div style="padding:6px 0;border-top:1px solid var(--line)"><b>'+esc(nm)+'</b>'+'<span class="tag">'+esc(tplOf(t).job)+'</span>'+'<div class="mut">攻擊 Lv.'+a+'/'+UPMAX+'　防禦 Lv.'+d+'/'+UPMAX+'</div><div class="btns">';
  h+=a>=UPMAX?'<button class="btn" disabled>攻擊已滿</button>':'<button class="btn" data-m="upg" data-a="'+i+':a" '+(G.pts>=upCost('a',a)?'':'disabled')+'>強化攻擊 '+upCost('a',a)+'</button>';
  h+=d>=UPMAX?'<button class="btn" disabled>防禦已滿</button>':'<button class="btn" data-m="upg" data-a="'+i+':d" '+(G.pts>=upCost('d',d)?'':'disabled')+'>強化防禦 '+upCost('d',d)+'</button>';
  return h+'</div></div>'}
@@ -511,7 +601,7 @@ function sysHtml(){return'<h3>存檔</h3><div class="card"><div class="mut">存�
  '<h3>回地面時</h3><div class="card"><div class="mut">回到地面時，探索紀錄要自動送給 AI，還是只填進輸入框讓你自己送？</div><button class="btn wide'+(G.auto?' amb':'')+'" data-act="autoSend">'+(G.auto?'自動送出（點一下改成手動）':'手動送出（點一下改成自動）')+'</button></div>'+
  '<h3>手動貼上 AI 區塊</h3><div class="card"><div class="mut">如果探索手帳沒自動讀到 AI 回覆裡的 isk 區塊，把那段複製貼在這裡。</div><textarea id="man"></textarea><button class="btn wide" data-act="manual">套用</button></div>'+
  '<h3>說明</h3><div class="card"><button class="btn wide" data-act="tour">重看探索手帳說明</button></div>'+
- '<h3>測試模式</h3><div class="card"><div class="mut">給作者測試：每按一次，納爾 +500、等級 +1。</div><button class="btn wide" data-act="cheat">測試加成</button></div>'+
+ '<h3>測試模式</h3><div class="card"><div class="mut">給作者測試：每按一次，納爾 +500、主角等級 +1。</div><button class="btn wide" data-act="cheat">測試加成</button><button class="btn wide" data-act="allJoin">測試：八位同伴全部加入</button></div>'+
  '<h3>重新開始</h3><div class="card"><div class="mut">清除這台裝置上的進度。聊天紀錄不會被刪掉，建議同時開一個新對話。</div><button class="btn red wide" data-act="reset">清除進度，重新開始</button></div><div class="mut">探索手帳版本 '+VER+'</div>'}
 function setupHtml(){return'<h3>啟用探索手帳</h3><div class="card"><div class="mut">公會發給每位探索者一本手帳，記錄你的狀態、隊伍與走過的樓層。</div><label>你的名字</label><input id="su-name" maxlength="12" placeholder="跟開局表單填的一樣" value="'+esc(G.name)+'"></div><button class="btn amb wide" data-act="start">啟用探索手帳</button>'}
 // ===== 迷宮頁 =====
@@ -522,14 +612,15 @@ function entryHtml(){var gd=gateDg(),h='<h3>迷宮</h3><div class="card"><div cl
 function dgShell(){return'<div><div class="vw"><canvas id="dv" width="480" height="300"></canvas><div id="en"></div></div><div class="drow"><div id="party"></div><canvas id="dm" width="132" height="132"></canvas></div><div id="dstat"></div><div id="ctrl"></div><div id="dlog"></div></div>'}
 function renderDg(v){var want=(G.in||BT)?'shell':'entry';if(DGMODE!==want){v.innerHTML=want==='shell'?dgShell():entryHtml();DGMODE=want;if($('ctrl'))$('ctrl')._h=null}if(want==='shell')dgUpdate()}
 function dgUpdate(){if(!$('party'))return;var h='';
- if(BT)BT.party.forEach(function(p){h+='<div class="pc'+(p.hp<=0?' down':'')+(p.def?' def':'')+'"><b>'+esc(p.name)+' <small>'+esc(p.style)+'</small></b><small>HP '+p.hp+'/'+p.max+(p.side==='p'?'｜氣力 '+G.sp+'/3':'｜氣力 '+p.sp+'/3')+(BT.buff&&BT.buff.r>0?' ⬆':'')+'</small><div class="hb"><i style="width:'+(p.hp/p.max*100)+'%"></i></div></div>'});
- else{h+='<div class="pc"><b>'+esc(G.name||'你')+' <small>Lv.'+G.lv+'</small></b><small>HP '+G.hp+'/'+mhp()+'</small><div class="hb"><i style="width:'+(G.hp/mhp()*100)+'%"></i></div></div>';
-  partyList().forEach(function(a){if(a.state==='dead')return;h+='<div class="pc'+(a.state==='injured'?' down':'')+'"><b>'+esc(a.name)+' <small>'+esc(a.style)+(a.state==='injured'?'・重傷':'')+'</small></b><small>HP '+a.hp+'/'+allyMax(a)+'</small><div class="hb"><i style="width:'+(a.hp/allyMax(a)*100)+'%"></i></div></div>'})}
+ function pc(name,job,row,hp,max,mp,mmp,cls,ex){return'<div class="pc'+cls+'"><b><span class="rw '+row+'">'+(row==='f'?'前':'後')+'</span>'+esc(name)+' <small>'+esc(job)+'</small></b><small>HP '+hp+'/'+max+'｜MP '+mp+'/'+mmp+' '+(ex||'')+'</small><div class="hb"><i style="width:'+(max?hp/max*100:0)+'%"></i></div><div class="hb mb"><i style="width:'+(mmp?mp/mmp*100:0)+'%"></i></div></div>'}
+ function byRow(a,b){return(a.row==='f'?0:1)-(b.row==='f'?0:1)}
+ if(BT)BT.party.slice().sort(byRow).forEach(function(p){h+=pc(p.name,p.job,p.row,p.hp,p.max,p.mp,p.mmp,(p.hp<=0?' down':'')+(p.def?' def':''),fxIcons(p)+(BT.buff&&p.hp>0?'⬆':''))});
+ else members().map(function(u){var s=st(u);return{u:u,s:s,row:rowOf(u)}}).sort(byRow).forEach(function(o){h+=pc(uname(o.u),tplOf(o.u).job+' Lv.'+o.u.lv,o.row,o.u.hp,o.s.hp,o.u.mp,o.s.mp,'','')});
  $('party').innerHTML=h;
  $('dstat').innerHTML=(G.in?'<span>'+FL[G.f].n+'</span>':'<span>地面：'+(BT&&BT.cfg.where?esc(BT.cfg.where):LOC[G.loc])+'</span>')+'<span>納爾 '+G.pts+'</span><span>鑰匙 '+G.keys+'</span><span>攻+'+(G.ua|0)+' 防+'+(G.ud|0)+'</span>';
  var lg=BT?BT.log:DL;$('dlog').innerHTML=lg.slice(0,8).map(function(x){return'<div>'+esc(x)+'</div>'}).join('');
  var c='';
- if(BT){var en='';BT.foes.forEach(function(f,i){var fb=spriteUrl(f.shape,f.col);en+='<div class="ec'+(f.hp<=0?' dead':'')+(f.boss?' boss':'')+(BT.mode==='tgt'&&f.hp>0?' sel':'')+'" data-tgt="'+i+'"><img src="'+IMG_BASE+'en/isk_e_'+f.img+'.webp" data-fb="'+fb+'" alt=""><div>'+esc(f.name)+'</div><div class="hb"><i style="width:'+(f.hp/f.max*100)+'%"></i></div></div>'});$('en').innerHTML=en;
+ if(BT){var en='',nF=BT.foes.length,wd=nF>3?Math.max(66,Math.floor(456/nF)-6):0;BT.foes.forEach(function(f,i){var fb=spriteUrl(f.shape,f.col);en+='<div class="ec'+(f.hp<=0?' dead':'')+(f.boss?' boss':'')+(wd?' sm':'')+(BT.mode==='tgt'&&f.hp>0?' sel':'')+'" data-tgt="'+i+'"'+(wd&&!f.boss?' style="width:'+wd+'px"':'')+'><img src="'+IMG_BASE+'en/isk_e_'+f.img+'.webp" data-fb="'+fb+'" alt=""><div>'+esc(f.name)+'</div><div class="st">'+(f.hp>0?(f.chant?'詠唱中 ':f.charging?'蓄力中 ':'')+fxIcons(f):'')+'</div><div class="hb"><i style="width:'+(f.hp/f.max*100)+'%"></i></div></div>'});$('en').innerHTML=en;
   if(BT.over)c='<div class="cmd"><button class="btn wide" disabled>……</button></div>';
   else if(BT.mode==='busy')c='<div class="cmd"><button class="btn wide" disabled>⏳ 行動中…</button></div>';
   else if(BT.mode==='tgt')c='<div class="cmd"><button class="btn wide amb" disabled>點選要攻擊的敵人</button><button class="btn wide" data-c="cancel">取消</button></div>';
@@ -558,14 +649,19 @@ function render(){chips();
 document.addEventListener('click',function(e){var b=e.target.closest('[data-tab]');if(b){setTab(b.dataset.tab);return}
  var a=e.target.closest('[data-act]');if(!a)return;var f=ACT[a.dataset.act];if(f)f(a.dataset.arg,a)});
 var ACT={
- start:function(){var nm=($('su-name').value||'').trim();if(!nm){toast('請填你的名字');return}G.name=nm;G.started=true;persist();post({t:'hint',s:''});TAB='story';render();showTour()},
+ start:function(){var nm=($('su-name').value||'').trim();if(!nm){toast('請填你的名字');return}G.name=nm;G.started=true;(D.START_PARTY||[]).forEach(joinParty);persist();post({t:'hint',s:''});TAB='story';render();showTour()},
  goLoc:function(k){if(ST.busy||!LOC[k])return;G.loc=k;persist();storySay('我前往'+LOC[k]+'。')},
  storyGo:function(i){var b=ST.blocks[+i];if(b)storySay(b.s||b.t)},
  storySend:function(){var t=$('s-in'),v=t?t.value:STdraft;STdraft='';storySay(v)},
  enterAsk:function(){var dg=gateDg();if(!dg||G.dead)return;var fl=startFloors(dg),fee=entryFee(dg),b='';fl.forEach(function(f){b+='<button class="btn'+(f===fl[fl.length-1]?' amb':'')+'" data-m="enter" data-a="'+f+'">第'+FL[f].lv+'層'+(G.guard[f]?'（首領已打倒）':'')+'</button>'});
   modal('<div data-lock><h3>進入'+DG[dg].n+'？</h3><div class="mut">'+DG[dg].intro+'<br>進入迷宮後不會和 AI 對話，離開時才送出探索紀錄。'+(DG[dg].fee?'<br>入場費：'+fee+' 納爾（每人 '+DG[dg].fee+'）。':'')+'<br>只能選第一層，或是已經到過的樓層。</div>'+b+'<button class="btn" data-m="close">再準備一下</button></div>')},
  autoSend:function(){G.auto=!G.auto;persist();render()},
- cheat:function(){G.pts+=500;G.lv++;G.hp=mhp();persist();render();toast('納爾 +500、等級 '+G.lv)},
+ cheat:function(){G.pts+=500;G.lv++;G.hp=mhp();G.mp=mmp();persist();render();toast('納爾 +500、等級 '+G.lv)},
+ allJoin:function(){if(G.in||BT){toast('請先回到地面');return}Object.keys(D.COMP).forEach(function(n){addComp(n);joinParty(n)});persist();render();toast('八位同伴已加入，前五位編入隊伍')},
+ row:function(a){var p=String(a).split(':'),u=p[0]==='@'?G:person(p[0]);if(!u||BT)return;var er=setRow(u,p[1]);if(er)toast(er);persist();render()},
+ join:function(n){if(G.in||BT){toast('請先回到地面');return}var er=joinParty(n);if(er)toast(er);persist();render()},
+ leave:function(n){if(G.in||BT){toast('請先回到地面');return}G.party=G.party.filter(function(x){return x!==n});persist();render()},
+ doWipe:function(){closeModal();wipeOut()},
  exp:function(){$('io').value=btoa(unescape(encodeURIComponent(JSON.stringify(G))));$('io').select();toast('已匯出，請複製存檔碼')},
  imp:function(){try{var o=JSON.parse(decodeURIComponent(escape(atob($('io').value.trim()))));if(!o||o.v!==1)throw 0;G=o;BT=null;persist();if(G.in){CUR=makeCur(G.f);snapView()}render();toast('匯入完成')}catch(e){toast('存檔碼不正確')}},
  manual:function(){var r=ingest($('man').value);toast(r.status==='done'?'已套用':r.msg)},
@@ -573,7 +669,7 @@ var ACT={
  reset:function(){modal('<div data-lock><h3>確定要重新開始？</h3><div class="mut">這台裝置上的進度會全部清除。</div><div class="btns"><button class="btn red" data-act="doReset">清除</button><button class="btn" data-m="close">取消</button></div></div>')},
  doReset:function(){G=fresh();BT=null;CUR=null;FD={};DL=[];closeModal();persist();TAB='story';DGMODE=null;render()},
  tourNext:function(i){showTour(+i)},tourEnd:function(){G.tourDone=true;persist();closeModal()}};
-var TOUR=[['📒 探索手帳','這是你的手帳。上方隨時顯示生命、納爾、等級和所在位置。數值都由手帳記錄，AI 不會改。'],['地面：劇情','在「劇情」頁和 AI 對話，用下方按鈕前往各個地點。探索者公會與商人公會可以買補給，殘火工坊可以強化攻擊與防禦。'],['迷宮：自己走','走到迷宮入口按「進入迷宮」，就會進入第一人稱的迷宮，這期間不會和 AI 對話。走到魔物身上就開打。每層起點的黑牆可以休息或回地面。'],['樓層與首領','每一層都有首領房。打倒首領後，通往下一層的路才會打開，之後也能從入口直接選那一層。魔物的等級等於樓層數。'],['戰鬥','回合選單：攻擊、技能、防禦、道具、逃跑。技能耗氣力、依等級解鎖，每回合恢復 1 點。首領戰時門會關上，逃不掉。'],['離開迷宮','回地面時，這趟的探索紀錄會一次送給 AI，由它接寫回到地面的場面。若全隊覆沒，本局結束。']];
+var TOUR=[['📒 探索手帳','這是你的手帳。上方隨時顯示生命、納爾、等級和所在位置。數值都由手帳記錄，AI 不會改。'],['地面：劇情','在「劇情」頁和 AI 對話，用下方按鈕前往各個地點。探索者公會與商人公會可以買補給，殘火工坊可以強化攻擊與防禦。'],['迷宮：自己走','走到迷宮入口按「進入迷宮」，就會進入第一人稱的迷宮，這期間不會和 AI 對話。走到魔物身上就開打。每層起點的黑牆可以休息或回地面。'],['樓層與首領','每一層都有首領房。打倒首領後，通往下一層的路才會打開，之後也能從入口直接選那一層。魔物的等級等於樓層數。'],['戰鬥','回合選單：攻擊、技能、防禦、道具、逃跑。所有人依敏捷輪流行動，同伴會自己判斷要做什麼。技能耗 MP，MP 只有在入口小房間休息或回地面時才會回復。首領戰時門會關上，逃不掉。'],['隊伍與站位','最多六人，前衛、後衛各三人，在「狀態」頁調整。近戰的敵人只打得到前衛，會詠唱或遠程的敵人才打得到後衛。全隊倒下不會結束遊戲，但會被拖回地面並損失三成納爾。'],['離開迷宮','回地面時，這趟的探索紀錄會一次送給 AI，由它接寫回到地面的場面。若全隊覆沒，本局結束。']];
 function showTour(i){i=i||0;var t=TOUR[i];modal('<div data-lock><h4>'+t[0]+'（'+(i+1)+'/'+TOUR.length+'）</h4><div>'+t[1]+'</div><div class="btns">'+(i<TOUR.length-1?'<button class="btn amb" data-act="tourNext" data-arg="'+(i+1)+'">下一步</button><button class="btn" data-act="tourEnd">略過</button>':'<button class="btn amb" data-act="tourEnd">開始</button>')+'</div></div>')}
 
 // ===== 精靈與第一人稱畫面 =====
@@ -596,7 +692,7 @@ var DRAW={
 var SPC={};function spr(shape,col){var k=shape+(col||'');return SPC[k]||(SPC[k]=mk(function(g){DRAW[shape](g,col)}))}
 function spriteUrl(shape,col){return spr(shape,col).toDataURL()}
 var ENI={};function enSpr(code,fb){if(!code||typeof Image==='undefined')return fb;var e=ENI[code];if(!e){e=ENI[code]={c:null};try{var im=new Image();im.onload=function(){try{var c=document.createElement('canvas');c.width=c.height=128;var g=c.getContext('2d');g.imageSmoothingQuality='high';g.drawImage(im,0,0,128,128);e.c=c}catch(x){}};im.src=IMG_BASE+'en/isk_e_'+code+'.webp'}catch(x){}}return e.c||fb}
-var SCALE={mon:.8,boss:1.05,chest:.6,key:.4,page:.45,spring:.95,stairs:.8};
+var SCALE={mon:.8,nest:.8,boss:1.05,chest:.6,key:.4,page:.45,spring:.95,stairs:.8};
 var cv=null,ctx=null,W=480,H=300,tmpC=document.createElement('canvas');tmpC.width=W;tmpC.height=H;var tmp=tmpC.getContext('2d'),zbuf=new Float32Array(W),FOV=.8,mini=null,mcv=null;
 var sh=function(r,g,b,f){return'rgb('+(Math.min(255,r*f)|0)+','+(Math.min(255,g*f)|0)+','+(Math.min(255,b*f)|0)+')'};var RD=Math.round;function lit(d){var q=D.LIGHT;return Math.min(q.max,q.near/(1+q.k1*d+q.k2*d*d))}
 function brick(x,top,lh,wx,f,mx,my,side,wc){ctx.fillStyle=sh(wc[0]*.28,wc[1]*.28,wc[2]*.28,f);ctx.fillRect(x,RD(top),1,RD(lh));var rows=6,ch=lh/rows;
@@ -606,7 +702,7 @@ function doorDraw(x,top,lh,wx,f,side,dc){var k=f*(side?.75:1),dark=(wx*5)%1<.07;
  ctx.fillStyle=sh(52,52,58,k);ctx.fillRect(x,RD(top+lh*.16),1,Math.max(1,RD(lh*.06)));ctx.fillRect(x,RD(top+lh*.78),1,Math.max(1,RD(lh*.06)));
  if(wx>.72&&wx<.8){ctx.fillStyle=sh(210,175,70,k);ctx.fillRect(x,RD(top+lh*.46),1,Math.max(1,RD(lh*.08)))}}
 function sprites(){var f=G.f,d=fd(f),o=[];
- d.feats.forEach(function(ft){if(!feAlive(f,ft))return;var img;if(ft.type==='mon'||ft.type==='boss'){var es=enemyStat(ft.foes[0],f);img=enSpr(es.img,spr(es.shape,es.col))}else img=spr(ft.type);o.push({x:ft.x,y:ft.y,img:img,sc:SCALE[ft.type],bob:ft.type==='mon'||ft.type==='boss'})});
+ d.feats.forEach(function(ft){if(!feAlive(f,ft))return;var img;if(isFoeFt(ft)){var es=enemyStat(ft.foes[0],f);img=enSpr(es.img,spr(es.shape,es.col))}else img=spr(ft.type);o.push({x:ft.x,y:ft.y,img:img,sc:SCALE[ft.type],bob:isFoeFt(ft)})});
  o.push({x:1,y:1,img:spr('spring'),sc:SCALE.spring});if(!FL[f].boss||G.guard[f])o.push({x:d.boss.x,y:d.boss.y,img:spr('stairs'),sc:SCALE.stairs});return o}
 function renderScene(t){if(!BT){var e0=document.getElementById('en');if(e0&&e0.firstChild)e0.innerHTML=''}if(!G.in||!CUR){ctx.fillStyle='#0a0806';ctx.fillRect(0,0,W,H);var gg=ctx.createLinearGradient(0,0,0,H);gg.addColorStop(0,'#14100b');gg.addColorStop(1,'#0a0806');ctx.fillStyle=gg;ctx.fillRect(0,0,W,H);ctx.fillStyle='#8d8168';ctx.font='18px sans-serif';ctx.textAlign='center';ctx.fillText(BT&&BT.cfg.where?BT.cfg.where:LOC[G.loc],W/2,40);ctx.textAlign='start';
   if(BT){ctx.fillStyle='rgba(0,0,0,.35)';ctx.fillRect(0,0,W,H)}if(flash>0){ctx.fillStyle='rgba(190,30,20,'+flash*.4+')';ctx.fillRect(0,0,W,H)}return}
@@ -616,7 +712,7 @@ function renderScene(t){if(!BT){var e0=document.getElementById('en');if(e0&&e0.f
  var dirX=Math.cos(ang),dirY=Math.sin(ang),plX=-dirY*FOV,plY=dirX*FOV;
  for(var x=0;x<W;x++){var cam=2*x/W-1,rdx=dirX+plX*cam,rdy=dirY+plY*cam,mx=Math.floor(px),my=Math.floor(py),side=0,ddx=Math.abs(1/rdx),ddy=Math.abs(1/rdy),sx,sy,sdx,sdy;
   if(rdx<0){sx=-1;sdx=(px-mx)*ddx}else{sx=1;sdx=(mx+1-px)*ddx}if(rdy<0){sy=-1;sdy=(py-my)*ddy}else{sy=1;sdy=(my+1-py)*ddy}
-  for(var n=0;n<40;n++){if(sdx<sdy){sdx+=ddx;mx+=sx;side=0}else{sdy+=ddy;my+=sy;side=1}var c=CUR[my]&&CUR[my][mx];if(c==='#'||c==='D'||c===undefined)break}
+  for(var n=0;n<40;n++){if(sdx<sdy){sdx+=ddx;mx+=sx;side=0}else{sdy+=ddy;my+=sy;side=1}var c=CUR[my]&&CUR[my][mx];if(c==='#'||c==='D'||c==='H'||c===undefined)break}
   var perp=side===0?sdx-ddx:sdy-ddy;zbuf[x]=perp;var wx=side===0?py+perp*rdy:px+perp*rdx;wx-=Math.floor(wx);
   var lh=H/Math.max(perp,.05),top=H/2-lh/2,f=lit(perp);
   if(CUR[my]&&CUR[my][mx]==='D')doorDraw(x,top,lh,wx,f,side,pal.door);else brick(x,top,lh,wx,f,mx,my,side,pal.w)}
@@ -629,8 +725,8 @@ function renderScene(t){if(!BT){var e0=document.getElementById('en');if(e0&&e0.f
  if(BT){ctx.fillStyle='rgba(0,0,0,.45)';ctx.fillRect(0,0,W,H)}if(flash>0){ctx.fillStyle='rgba(190,30,20,'+flash*.4+')';ctx.fillRect(0,0,W,H)}}
 function drawMini(){mini.fillStyle='#000';mini.fillRect(0,0,132,132);if(!G.in||!CUR)return;if(isDark()){mini.fillStyle='#555';mini.font='12px sans-serif';mini.fillText('黑暗中看不見地圖',10,66);return}
  var n=CUR.length,cs=Math.floor(132/n),ox=Math.floor((132-cs*n)/2),seen=G.seen[G.f]||{},d=fd(G.f);
- for(var y=0;y<n;y++)for(var x=0;x<n;x++){if(!seen[x+','+y])continue;var c=CUR[y][x];mini.fillStyle=c==='#'?'#4a3d30':c==='D'?'#9a6a2c':c==='>'?'#e0b95a':'#2a221a';mini.fillRect(ox+x*cs,ox+y*cs,cs,cs)}
- d.feats.forEach(function(ft){if(!feAlive(G.f,ft)||!seen[ft.x+','+ft.y])return;mini.fillStyle=(ft.type==='mon'||ft.type==='boss')?'#d04030':ft.type==='chest'?'#e0902a':ft.type==='page'?'#e8e0b0':'#f0d040';mini.fillRect(ox+ft.x*cs+1,ox+ft.y*cs+1,Math.max(2,cs-2),Math.max(2,cs-2))});
+ for(var y=0;y<n;y++)for(var x=0;x<n;x++){if(!seen[x+','+y])continue;var c=CUR[y][x];mini.fillStyle=(c==='#'||c==='H')?'#4a3d30':c==='D'?'#9a6a2c':c==='>'?'#e0b95a':'#2a221a';mini.fillRect(ox+x*cs,ox+y*cs,cs,cs)}
+ d.feats.forEach(function(ft){if(!feAlive(G.f,ft)||!seen[ft.x+','+ft.y])return;mini.fillStyle=isFoeFt(ft)?'#d04030':ft.type==='chest'?'#e0902a':ft.type==='page'?'#e8e0b0':'#f0d040';mini.fillRect(ox+ft.x*cs+1,ox+ft.y*cs+1,Math.max(2,cs-2),Math.max(2,cs-2))});
  mini.fillStyle='#4fa8d8';mini.fillRect(ox+cs+1,ox+cs+1,Math.max(2,cs-2),Math.max(2,cs-2));
  mini.save();mini.translate(ox+px*cs,ox+py*cs);mini.rotate(ang+Math.PI/2);mini.fillStyle='#7fe08a';var s=Math.max(3,cs*.45);mini.beginPath();mini.moveTo(0,-s);mini.lineTo(s*.8,s*.8);mini.lineTo(-s*.8,s*.8);mini.closePath();mini.fill();mini.restore()}
 var last=0;
@@ -646,7 +742,7 @@ render();post({t:'hello'});arm();if(!G.started)post({t:'hint',s:'先啟用探索
 if(G.started&&!G.tourDone)showTour();
 requestAnimationFrame(frame);
 window.LTP={ingest:ingest,state:function(){return G},ver:VER};
-window.__t={sf:startFloors,stat:enemyStat,ui:function(k){TAB=k;DGMODE=null;render();return $('view').innerHTML+$('sbar').innerHTML},ask:function(){ACT.enterAsk();return $('mbox').innerHTML},spring:function(){springMenu();return $('mbox').innerHTML},modalHtml:function(){return $('mbox').innerHTML},up:upgrade,buy:buy,face:function(t){G.turn=t;turn=t;tang=ang=-Math.PI/2+t*Math.PI/2},put:function(x,y){G.x=x;G.y=y;px=tx=x+.5;py=ty=y+.5},FL:FL,G:function(){return G},cmd:cmd,BT:function(){return BT},enter:enterDungeon,exit:exitDungeon,ef:enterFloor,fd:fd,startBattle:startBattle,fast:function(){window.__fast=1},summary:summary,ingest:ingest,act:act,compact:compact,tail:tailFor,storySay:storySay,sp:storyPush,sbar:sbarHtml,CUR:function(){return CUR}};
+window.__t={sf:startFloors,stat:enemyStat,ui:function(k){TAB=k;DGMODE=null;render();return $('view').innerHTML+$('sbar').innerHTML},ask:function(){ACT.enterAsk();return $('mbox').innerHTML},spring:function(){springMenu();return $('mbox').innerHTML},modalHtml:function(){return $('mbox').innerHTML},up:upgrade,buy:buy,join:joinParty,add:addComp,setRow:setRow,st:st,members:members,act2:function(k,a){return ACT[k](a)},face:function(t){G.turn=t;turn=t;tang=ang=-Math.PI/2+t*Math.PI/2},put:function(x,y){G.x=x;G.y=y;px=tx=x+.5;py=ty=y+.5},FL:FL,G:function(){return G},cmd:cmd,BT:function(){return BT},enter:enterDungeon,exit:exitDungeon,ef:enterFloor,fd:fd,startBattle:startBattle,fast:function(){window.__fast=1},summary:summary,ingest:ingest,act:act,compact:compact,tail:tailFor,storySay:storySay,sp:storyPush,sbar:sbarHtml,CUR:function(){return CUR}};
 })();
 </script>
 </body>
